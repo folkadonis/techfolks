@@ -1,0 +1,181 @@
+version: '3.8'
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: techfolks-backend
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_USER=${DB_USER}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_NAME=${DB_NAME}
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - JWT_SECRET=${JWT_SECRET}
+      - JWT_REFRESH_SECRET=${JWT_REFRESH_SECRET}
+      - JUDGE0_API_URL=http://judge0:2358
+      - JUDGE0_AUTH_TOKEN=${JUDGE0_AUTH_TOKEN}
+    ports:
+      - "3000:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      judge0:
+        condition: service_started
+    networks:
+      - techfolks-network
+    volumes:
+      - ./logs:/app/logs
+      - ./uploads:/app/uploads
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  postgres:
+    image: postgres:15-alpine
+    container_name: techfolks-postgres
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=${DB_USER}
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
+      - POSTGRES_DB=${DB_NAME}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./src/database/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql
+      - ./src/database/migrations:/docker-entrypoint-initdb.d/migrations
+    ports:
+      - "5432:5432"
+    networks:
+      - techfolks-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: techfolks-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-}
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    networks:
+      - techfolks-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  judge0:
+    image: judge0/judge0:1.13.0
+    container_name: techfolks-judge0
+    restart: unless-stopped
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-}
+      - POSTGRES_HOST=judge0-postgres
+      - POSTGRES_USER=judge0
+      - POSTGRES_PASSWORD=${JUDGE0_DB_PASSWORD}
+      - POSTGRES_DB=judge0
+      - AUTHN_HEADER=X-Auth-Token
+      - AUTHN_TOKEN=${JUDGE0_AUTH_TOKEN}
+    ports:
+      - "2358:2358"
+    depends_on:
+      - redis
+      - judge0-postgres
+    networks:
+      - techfolks-network
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+
+  judge0-postgres:
+    image: postgres:13-alpine
+    container_name: techfolks-judge0-postgres
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=judge0
+      - POSTGRES_PASSWORD=${JUDGE0_DB_PASSWORD}
+      - POSTGRES_DB=judge0
+    volumes:
+      - judge0_postgres_data:/var/lib/postgresql/data
+    networks:
+      - techfolks-network
+
+  nginx:
+    image: nginx:alpine
+    container_name: techfolks-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+      - ./nginx/logs:/var/log/nginx
+    depends_on:
+      - app
+    networks:
+      - techfolks-network
+
+  # Optional monitoring stack
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: techfolks-prometheus
+    restart: unless-stopped
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+    ports:
+      - "9090:9090"
+    networks:
+      - techfolks-network
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: techfolks-grafana
+    restart: unless-stopped
+    environment:
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_USER:-admin}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-admin}
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards
+      - ./monitoring/grafana/datasources:/etc/grafana/provisioning/datasources
+    ports:
+      - "3001:3000"
+    depends_on:
+      - prometheus
+    networks:
+      - techfolks-network
+
+networks:
+  techfolks-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  redis_data:
+  judge0_postgres_data:
+  prometheus_data:
+  grafana_data:
