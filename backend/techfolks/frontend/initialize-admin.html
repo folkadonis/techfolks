@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Initialize Admin User</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        button {
+            background: #3b82f6;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px 5px;
+        }
+        button:hover {
+            background: #2563eb;
+        }
+        .message {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+        }
+        .success {
+            background: #d1fae5;
+            color: #065f46;
+            border: 1px solid #6ee7b7;
+        }
+        .info {
+            background: #dbeafe;
+            color: #1e40af;
+            border: 1px solid #93c5fd;
+        }
+        .warning {
+            background: #fef3c7;
+            color: #92400e;
+            border: 1px solid #fbbf24;
+        }
+    </style>
+</head>
+<body>
+    <h1>Initialize Admin User</h1>
+    <p>This page will create the default admin user for TechFolks platform.</p>
+    
+    <div id="message"></div>
+    
+    <button onclick="createAdminUser()">Create Admin User</button>
+    <button onclick="checkAdminExists()">Check if Admin Exists</button>
+    <button onclick="showAllUsers()">Show All Users</button>
+    
+    <div id="output"></div>
+
+    <script>
+        function showMessage(text, type = 'info') {
+            const messageDiv = document.getElementById('message');
+            messageDiv.className = `message ${type}`;
+            messageDiv.textContent = text;
+            setTimeout(() => {
+                messageDiv.textContent = '';
+                messageDiv.className = '';
+            }, 5000);
+        }
+
+        function createAdminUser() {
+            const users = JSON.parse(localStorage.getItem('users') || '[]');
+            
+            // Check if admin already exists
+            const adminExists = users.find(user => user.username === 'admin');
+            if (adminExists) {
+                showMessage('Admin user already exists!', 'warning');
+                return;
+            }
+
+            // Create admin user
+            const adminUser = {
+                id: 1,
+                username: 'admin',
+                email: 'admin@techfolks.com',
+                password: 'admin123', // In real app, this would be hashed
+                role: 'admin',
+                rating: 3000,
+                max_rating: 3000,
+                problems_solved: 500,
+                contests_participated_count: 100,
+                created_at: new Date().toISOString(),
+                createdAt: new Date().toISOString()
+            };
+
+            users.unshift(adminUser);
+            localStorage.setItem('users', JSON.stringify(users));
+            
+            showMessage('Admin user created successfully! Username: admin, Password: admin123', 'success');
+            showAllUsers();
+        }
+
+        function checkAdminExists() {
+            const users = JSON.parse(localStorage.getItem('users') || '[]');
+            const adminExists = users.find(user => user.username === 'admin');
+            
+            if (adminExists) {
+                showMessage('Admin user exists!', 'success');
+            } else {
+                showMessage('Admin user does not exist', 'warning');
+            }
+        }
+
+        function showAllUsers() {
+            const users = JSON.parse(localStorage.getItem('users') || '[]');
+            const output = document.getElementById('output');
+            
+            if (users.length === 0) {
+                output.innerHTML = '<h3>No users found</h3>';
+                return;
+            }
+            
+            output.innerHTML = '<h3>All Users:</h3>';
+            users.forEach(user => {
+                output.innerHTML += `<div style="margin: 10px 0; padding: 10px; background: #f3f4f6; border-radius: 4px;">
+                    <strong>${user.username}</strong> (${user.role}) - ${user.email}<br>
+                    <small>Rating: ${user.rating} | Problems: ${user.problems_solved}</small>
+                </div>`;
+            });
+        }
+
+        // Show existing users on load
+        window.onload = showAllUsers;
+    </script>
+</body>
+</html>

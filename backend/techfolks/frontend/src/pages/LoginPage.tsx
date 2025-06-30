@@ -25,11 +25,18 @@ const LoginPage = () => {
     setIsLoading(true)
     try {
       const response = await authAPI.login(data)
-      login(response.user, response.token)
-      toast.success('Login successful!')
-      navigate('/dashboard')
+      
+      // The response is already the data object from axios interceptor
+      if (response?.data?.user && response?.data?.token) {
+        login(response.data.user, response.data.token)
+        toast.success('Login successful!')
+        navigate('/dashboard')
+      } else {
+        throw new Error('Invalid login response')
+      }
     } catch (error: any) {
-      toast.error(error.response?.data?.message || 'Login failed')
+      const errorMessage = error?.response?.data?.message || error?.message || 'Login failed. Please try again.'
+      toast.error(errorMessage)
     } finally {
       setIsLoading(false)
     }
@@ -53,7 +60,7 @@ const LoginPage = () => {
               placeholder="Enter your username"
             />
             {errors.username && (
-              <p className="text-red-500 text-sm mt-1">{errors.username.message}</p>
+              <p className="text-destructive text-sm mt-1">{errors.username.message}</p>
             )}
           </div>
 
@@ -69,7 +76,7 @@ const LoginPage = () => {
               placeholder="Enter your password"
             />
             {errors.password && (
-              <p className="text-red-500 text-sm mt-1">{errors.password.message}</p>
+              <p className="text-destructive text-sm mt-1">{errors.password.message}</p>
             )}
           </div>
 
@@ -83,9 +90,9 @@ const LoginPage = () => {
         </form>
 
         <div className="mt-6 text-center">
-          <p className="text-sm text-gray-600 dark:text-gray-400">
+          <p className="text-sm text-muted-foreground">
             Don't have an account?{' '}
-            <Link to="/register" className="text-primary-600 hover:underline">
+            <Link to="/register" className="text-primary hover:underline">
               Register here
             </Link>
           </p>

@@ -1,5 +1,4 @@
 import { create } from 'zustand'
-import { persist } from 'zustand/middleware'
 
 interface User {
   id: string
@@ -8,6 +7,11 @@ interface User {
   role: 'user' | 'admin'
   avatar?: string
   createdAt: string
+  problems_solved?: number
+  solved_problems?: number[]
+  rating?: number
+  max_rating?: number
+  contests_participated_count?: number
 }
 
 interface AuthState {
@@ -16,29 +20,23 @@ interface AuthState {
   isAuthenticated: boolean
   isLoading: boolean
   login: (user: User, token: string) => void
+  register: (user: User) => void
   logout: () => void
   updateUser: (user: Partial<User>) => void
   setLoading: (loading: boolean) => void
 }
 
-export const useAuthStore = create<AuthState>()(
-  persist(
-    (set) => ({
-      user: null,
-      token: null,
-      isAuthenticated: false,
-      isLoading: true,
-      login: (user, token) => set({ user, token, isAuthenticated: true, isLoading: false }),
-      logout: () => set({ user: null, token: null, isAuthenticated: false, isLoading: false }),
-      updateUser: (userData) =>
-        set((state) => ({
-          user: state.user ? { ...state.user, ...userData } : null,
-        })),
-      setLoading: (loading) => set({ isLoading: loading }),
-    }),
-    {
-      name: 'auth-storage',
-      partialize: (state) => ({ user: state.user, token: state.token, isAuthenticated: state.isAuthenticated }),
-    },
-  ),
-)
+export const useAuthStore = create<AuthState>()((set) => ({
+  user: null,
+  token: null,
+  isAuthenticated: false,
+  isLoading: false,
+  login: (user, token) => set({ user, token, isAuthenticated: true, isLoading: false }),
+  register: (user) => set({ user, token: null, isAuthenticated: true, isLoading: false }),
+  logout: () => set({ user: null, token: null, isAuthenticated: false, isLoading: false }),
+  updateUser: (userData) =>
+    set((state) => ({
+      user: state.user ? { ...state.user, ...userData } : null,
+    })),
+  setLoading: (loading) => set({ isLoading: loading }),
+}))

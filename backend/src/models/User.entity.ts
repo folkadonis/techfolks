@@ -80,6 +80,9 @@ export class User {
   @Column({ name: 'is_verified', default: false })
   is_verified: boolean;
 
+  @Column({ name: 'is_banned', default: false })
+  is_banned: boolean;
+
   @Column({ name: 'verification_token', length: 255, nullable: true })
   verification_token: string;
 

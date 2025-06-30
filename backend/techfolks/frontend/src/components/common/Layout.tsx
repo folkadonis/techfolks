@@ -2,6 +2,7 @@ import { ReactNode } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { useAuthStore } from '@store/authStore'
 import { cn } from '@utils/cn'
+import ThemeToggle from '@components/settings/ThemeToggle'
 
 interface LayoutProps {
   children: ReactNode
@@ -15,22 +16,25 @@ const Layout = ({ children }: LayoutProps) => {
     { name: 'Home', href: '/', show: true },
     { name: 'Problems', href: '/problems', show: true },
     { name: 'Contests', href: '/contests', show: true },
+    { name: 'Groups', href: '/groups', show: isAuthenticated },
     { name: 'Leaderboard', href: '/leaderboard', show: true },
     { name: 'Dashboard', href: '/dashboard', show: isAuthenticated },
+    { name: 'Settings', href: '/settings', show: isAuthenticated },
+    { name: 'Admin', href: '/admin', show: isAuthenticated && user?.role === 'admin' },
   ]
 
   const isActive = (path: string) => location.pathname === path
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+    <div className="min-h-screen bg-background">
       {/* Navigation */}
-      <nav className="bg-white dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700">
+      <nav className="bg-card shadow-sm border-b border-border">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16">
             <div className="flex">
               {/* Logo */}
               <Link to="/" className="flex items-center">
-                <span className="text-2xl font-bold text-primary-600 dark:text-primary-400">
+                <span className="text-2xl font-bold text-primary">
                   TechFolks
                 </span>
               </Link>
@@ -44,10 +48,10 @@ const Layout = ({ children }: LayoutProps) => {
                         key={item.name}
                         to={item.href}
                         className={cn(
-                          'inline-flex items-center px-1 pt-1 text-sm font-medium border-b-2',
+                          'inline-flex items-center px-1 pt-1 text-sm font-medium border-b-2 transition-colors',
                           isActive(item.href)
-                            ? 'border-primary-500 text-gray-900 dark:text-white'
-                            : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300',
+                            ? 'border-primary text-foreground'
+                            : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border',
                         )}
                       >
                         {item.name}
@@ -59,11 +63,16 @@ const Layout = ({ children }: LayoutProps) => {
 
             {/* Right side */}
             <div className="flex items-center space-x-4">
+              {/* Theme Toggle (always visible) */}
+              <div className="hidden md:block">
+                <ThemeToggle />
+              </div>
+              
               {isAuthenticated && user ? (
                 <>
                   <Link
                     to="/profile"
-                    className="text-sm text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white"
+                    className="text-sm text-foreground hover:text-primary transition-colors"
                   >
                     {user.username}
                   </Link>
@@ -78,7 +87,7 @@ const Layout = ({ children }: LayoutProps) => {
                 <>
                   <Link
                     to="/login"
-                    className="text-sm text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white"
+                    className="text-sm text-foreground hover:text-primary transition-colors"
                   >
                     Login
                   </Link>
@@ -103,9 +112,9 @@ const Layout = ({ children }: LayoutProps) => {
       </main>
 
       {/* Footer */}
-      <footer className="bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700">
+      <footer className="bg-card border-t border-border">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <div className="text-center text-sm text-gray-500 dark:text-gray-400">
+          <div className="text-center text-sm text-muted-foreground">
             © {new Date().getFullYear()} TechFolks. All rights reserved.
           </div>
         </div>

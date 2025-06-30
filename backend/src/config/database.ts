@@ -33,7 +33,7 @@ export const AppDataSource = new DataSource({
   synchronize: process.env.NODE_ENV === 'development',
   logging: process.env.NODE_ENV === 'development',
   entities: [User, Problem, Submission, Contest],
-  migrations: ['src/database/migrations/*.ts'],
+  migrations: [],
   subscribers: [],
 });
 

@@ -6,6 +6,10 @@ import { ReactQueryDevtools } from '@tanstack/react-query-devtools'
 import { Toaster } from 'react-hot-toast'
 import App from './App'
 import './styles/index.css'
+import { initializeTheme } from './utils/theme'
+
+// Initialize theme before React renders
+initializeTheme()
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -26,18 +30,22 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
           position="top-right"
           toastOptions={{
             duration: 4000,
+            className: '',
             style: {
-              background: '#333',
-              color: '#fff',
+              background: 'hsl(var(--card))',
+              color: 'hsl(var(--card-foreground))',
+              border: '1px solid hsl(var(--border))',
             },
             success: {
               style: {
-                background: '#22c55e',
+                background: 'hsl(142 76% 36%)',
+                color: 'white',
               },
             },
             error: {
               style: {
-                background: '#ef4444',
+                background: 'hsl(var(--destructive))',
+                color: 'hsl(var(--destructive-foreground))',
               },
             },
           }}

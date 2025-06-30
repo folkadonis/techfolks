@@ -6,13 +6,13 @@ import { User } from '../models/User.entity';
 import { UserRole } from '../types/enums';
 import crypto from 'crypto';
 import { sendEmail } from '../services/email.service';
-
-const userRepository = AppDataSource.getRepository(User);
+import { AuthRequest } from '../middleware/auth.middleware';
 
 export class AuthController {
   static async register(req: Request, res: Response, next: NextFunction) {
     try {
       const { username, email, password, fullName } = req.body;
+      const userRepository = AppDataSource.getRepository(User);
 
       // Check if user already exists
       const existingUser = await userRepository.findOne({
@@ -29,38 +29,28 @@ export class AuthController {
       // Hash password
       const hashedPassword = await bcrypt.hash(password, 10);
 
-      // Create new user
+      // Generate verification token
+      const verificationToken = crypto.randomBytes(32).toString('hex');
+
+      // Create user
       const user = userRepository.create({
         username,
         email,
         password: hashedPassword,
         full_name: fullName,
         role: UserRole.USER,
+        verification_token: verificationToken,
+        is_verified: false,
         rating: 1200,
-        contribution_points: 0,
+        max_rating: 1200,
         problems_solved: 0,
         contests_participated_count: 0,
-        is_verified: false,
-        verification_token: crypto.randomBytes(32).toString('hex'),
-        created_at: new Date(),
-        updated_at: new Date()
+        contribution_points: 0
       });
 
       await userRepository.save(user);
 
-      // Send verification email
-      const verificationUrl = `${process.env.FRONTEND_URL}/verify-email?token=${user.verification_token}`;
-      await sendEmail({
-        to: user.email,
-        subject: 'Verify your TechFolks account',
-        html: `
-          <h1>Welcome to TechFolks!</h1>
-          <p>Please click the link below to verify your account:</p>
-          <a href="${verificationUrl}">Verify Account</a>
-        `
-      });
-
-      // Generate JWT token
+      // Generate JWT tokens
       const token = jwt.sign(
         { userId: user.id, username: user.username, role: user.role },
         process.env.JWT_SECRET || 'your-secret-key',
@@ -69,18 +59,33 @@ export class AuthController {
 
       const refreshToken = jwt.sign(
         { userId: user.id },
-        process.env.JWT_REFRESH_SECRET || 'your-refresh-secret',
+        process.env.JWT_REFRESH_SECRET || 'your-refresh-secret-key',
         { expiresIn: '30d' }
       );
 
-      // Remove password from response
-      const { password: _, ...userWithoutPassword } = user;
+      // Send verification email
+      try {
+        await sendEmail({
+          to: email,
+          subject: 'Verify your TechFolks account',
+          html: `
+            <h1>Welcome to TechFolks!</h1>
+            <p>Please click the link below to verify your email address:</p>
+            <a href="${process.env.FRONTEND_URL}/verify-email?token=${verificationToken}">Verify Email</a>
+          `
+        });
+      } catch (emailError) {
+        console.error('Failed to send verification email:', emailError);
+      }
+
+      // Remove sensitive data from response
+      const { password: _, verification_token: __, ...userResponse } = user;
 
       res.status(201).json({
         success: true,
         message: 'Registration successful. Please check your email to verify your account.',
         data: {
-          user: userWithoutPassword,
+          user: userResponse,
           token,
           refreshToken
         }
@@ -93,6 +98,7 @@ export class AuthController {
   static async login(req: Request, res: Response, next: NextFunction) {
     try {
       const { username, password } = req.body;
+      const userRepository = AppDataSource.getRepository(User);
 
       // Find user by username or email
       const user = await userRepository.findOne({
@@ -119,7 +125,7 @@ export class AuthController {
       user.last_login = new Date();
       await userRepository.save(user);
 
-      // Generate tokens
+      // Generate JWT tokens
       const token = jwt.sign(
         { userId: user.id, username: user.username, role: user.role },
         process.env.JWT_SECRET || 'your-secret-key',
@@ -128,18 +134,18 @@ export class AuthController {
 
       const refreshToken = jwt.sign(
         { userId: user.id },
-        process.env.JWT_REFRESH_SECRET || 'your-refresh-secret',
+        process.env.JWT_REFRESH_SECRET || 'your-refresh-secret-key',
         { expiresIn: '30d' }
       );
 
-      // Remove password from response
-      const { password: _, ...userWithoutPassword } = user;
+      // Remove sensitive data from response
+      const { password: _, verification_token: __, reset_password_token: ___, ...userResponse } = user;
 
       res.json({
         success: true,
         message: 'Login successful',
         data: {
-          user: userWithoutPassword,
+          user: userResponse,
           token,
           refreshToken
         }
@@ -149,9 +155,22 @@ export class AuthController {
     }
   }
 
+  static async logout(req: AuthRequest, res: Response, next: NextFunction) {
+    try {
+      // In a real implementation, you might want to blacklist the token
+      res.json({
+        success: true,
+        message: 'Logout successful'
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
   static async refreshToken(req: Request, res: Response, next: NextFunction) {
     try {
       const { refreshToken } = req.body;
+      const userRepository = AppDataSource.getRepository(User);
 
       if (!refreshToken) {
         return res.status(401).json({
@@ -163,10 +182,9 @@ export class AuthController {
       // Verify refresh token
       const decoded = jwt.verify(
         refreshToken,
-        process.env.JWT_REFRESH_SECRET || 'your-refresh-secret'
+        process.env.JWT_REFRESH_SECRET || 'your-refresh-secret-key'
       ) as { userId: number };
 
-      // Find user
       const user = await userRepository.findOne({
         where: { id: decoded.userId }
       });
@@ -179,7 +197,7 @@ export class AuthController {
       }
 
       // Generate new access token
-      const token = jwt.sign(
+      const newToken = jwt.sign(
         { userId: user.id, username: user.username, role: user.role },
         process.env.JWT_SECRET || 'your-secret-key',
         { expiresIn: '7d' }
@@ -187,10 +205,12 @@ export class AuthController {
 
       res.json({
         success: true,
-        data: { token }
+        data: {
+          token: newToken
+        }
       });
     } catch (error) {
-      res.status(401).json({
+      return res.status(401).json({
         success: false,
         message: 'Invalid refresh token'
       });
@@ -200,9 +220,11 @@ export class AuthController {
   static async forgotPassword(req: Request, res: Response, next: NextFunction) {
     try {
       const { email } = req.body;
+      const userRepository = AppDataSource.getRepository(User);
 
       const user = await userRepository.findOne({ where: { email } });
 
+      // Always return success to prevent email enumeration
       if (!user) {
         return res.json({
           success: true,
@@ -214,21 +236,24 @@ export class AuthController {
       const resetToken = crypto.randomBytes(32).toString('hex');
       user.reset_password_token = resetToken;
       user.reset_password_expires = new Date(Date.now() + 3600000); // 1 hour
+
       await userRepository.save(user);
 
       // Send reset email
-      const resetUrl = `${process.env.FRONTEND_URL}/reset-password?token=${resetToken}`;
-      await sendEmail({
-        to: user.email,
-        subject: 'Password Reset Request',
-        html: `
-          <h1>Password Reset</h1>
-          <p>You requested a password reset. Click the link below to reset your password:</p>
-          <a href="${resetUrl}">Reset Password</a>
-          <p>This link will expire in 1 hour.</p>
-          <p>If you didn't request this, please ignore this email.</p>
-        `
-      });
+      try {
+        await sendEmail({
+          to: email,
+          subject: 'Reset your TechFolks password',
+          html: `
+            <h1>Password Reset</h1>
+            <p>You requested a password reset. Click the link below to reset your password:</p>
+            <a href="${process.env.FRONTEND_URL}/reset-password?token=${resetToken}">Reset Password</a>
+            <p>This link will expire in 1 hour.</p>
+          `
+        });
+      } catch (emailError) {
+        console.error('Failed to send reset email:', emailError);
+      }
 
       res.json({
         success: true,
@@ -242,14 +267,16 @@ export class AuthController {
   static async resetPassword(req: Request, res: Response, next: NextFunction) {
     try {
       const { token, newPassword } = req.body;
+      const userRepository = AppDataSource.getRepository(User);
 
       const user = await userRepository.findOne({
-        where: {
-          reset_password_token: token
+        where: { 
+          reset_password_token: token,
+          reset_password_expires: { $gt: new Date() } as any
         }
       });
 
-      if (!user || !user.reset_password_expires || user.reset_password_expires < new Date()) {
+      if (!user) {
         return res.status(400).json({
           success: false,
           message: 'Invalid or expired reset token'
@@ -257,9 +284,13 @@ export class AuthController {
       }
 
       // Hash new password
-      user.password = await bcrypt.hash(newPassword, 10);
+      const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+      // Update user
+      user.password = hashedPassword;
       user.reset_password_token = null as any;
       user.reset_password_expires = null as any;
+
       await userRepository.save(user);
 
       res.json({
@@ -274,6 +305,14 @@ export class AuthController {
   static async verifyEmail(req: Request, res: Response, next: NextFunction) {
     try {
       const { token } = req.query;
+      const userRepository = AppDataSource.getRepository(User);
+
+      if (!token) {
+        return res.status(400).json({
+          success: false,
+          message: 'Verification token required'
+        });
+      }
 
       const user = await userRepository.findOne({
         where: { verification_token: token as string }
@@ -288,6 +327,7 @@ export class AuthController {
 
       user.is_verified = true;
       user.verification_token = null as any;
+
       await userRepository.save(user);
 
       res.json({
@@ -299,20 +339,20 @@ export class AuthController {
     }
   }
 
-  static async logout(req: Request, res: Response) {
-    res.json({
-      success: true,
-      message: 'Logged out successfully'
-    });
-  }
-
-  static async getProfile(req: Request, res: Response, next: NextFunction) {
+  static async getProfile(req: AuthRequest, res: Response, next: NextFunction) {
     try {
-      const userId = (req as any).user.userId;
+      const userId = req.user!.userId;
+      const userRepository = AppDataSource.getRepository(User);
 
       const user = await userRepository.findOne({
         where: { id: userId },
-        relations: ['submissions', 'contests']
+        select: [
+          'id', 'username', 'email', 'full_name', 'avatar_url', 'bio',
+          'country', 'institution', 'github_username', 'linkedin_url',
+          'website_url', 'rating', 'max_rating', 'role', 'is_verified',
+          'created_at', 'problems_solved', 'contests_participated_count',
+          'contribution_points'
+        ]
       });
 
       if (!user) {
@@ -322,21 +362,20 @@ export class AuthController {
         });
       }
 
-      const { password: _, ...userWithoutPassword } = user;
-
       res.json({
         success: true,
-        data: userWithoutPassword
+        data: user
       });
     } catch (error) {
       next(error);
     }
   }
 
-  static async updateProfile(req: Request, res: Response, next: NextFunction) {
+  static async updateProfile(req: AuthRequest, res: Response, next: NextFunction) {
     try {
-      const userId = (req as any).user.userId;
-      const { fullName, bio, country, institution, github_username, linkedin_url, website_url } = req.body;
+      const userId = req.user!.userId;
+      const updateData = req.body;
+      const userRepository = AppDataSource.getRepository(User);
 
       const user = await userRepository.findOne({
         where: { id: userId }
@@ -349,34 +388,38 @@ export class AuthController {
         });
       }
 
-      // Update fields
-      if (fullName) user.full_name = fullName;
-      if (bio) user.bio = bio;
-      if (country) user.country = country;
-      if (institution) user.institution = institution;
-      if (github_username) user.github_username = github_username;
-      if (linkedin_url) user.linkedin_url = linkedin_url;
-      if (website_url) user.website_url = website_url;
-      
-      user.updated_at = new Date();
+      // Update allowed fields
+      const allowedFields = [
+        'full_name', 'bio', 'country', 'institution',
+        'github_username', 'linkedin_url', 'website_url'
+      ];
+
+      allowedFields.forEach(field => {
+        if (updateData[field] !== undefined) {
+          (user as any)[field] = updateData[field];
+        }
+      });
+
       await userRepository.save(user);
 
-      const { password: _, ...userWithoutPassword } = user;
+      // Remove sensitive data from response
+      const { password: _, verification_token: __, reset_password_token: ___, ...userResponse } = user;
 
       res.json({
         success: true,
         message: 'Profile updated successfully',
-        data: userWithoutPassword
+        data: userResponse
       });
     } catch (error) {
       next(error);
     }
   }
 
-  static async changePassword(req: Request, res: Response, next: NextFunction) {
+  static async changePassword(req: AuthRequest, res: Response, next: NextFunction) {
     try {
-      const userId = (req as any).user.userId;
+      const userId = req.user!.userId;
       const { currentPassword, newPassword } = req.body;
+      const userRepository = AppDataSource.getRepository(User);
 
       const user = await userRepository.findOne({
         where: { id: userId }
@@ -390,17 +433,18 @@ export class AuthController {
       }
 
       // Verify current password
-      const isPasswordValid = await bcrypt.compare(currentPassword, user.password);
-      if (!isPasswordValid) {
+      const isCurrentPasswordValid = await bcrypt.compare(currentPassword, user.password);
+      if (!isCurrentPasswordValid) {
         return res.status(401).json({
           success: false,
           message: 'Current password is incorrect'
         });
       }
 
-      // Hash and save new password
-      user.password = await bcrypt.hash(newPassword, 10);
-      user.updated_at = new Date();
+      // Hash new password
+      const hashedNewPassword = await bcrypt.hash(newPassword, 10);
+
+      user.password = hashedNewPassword;
       await userRepository.save(user);
 
       res.json({

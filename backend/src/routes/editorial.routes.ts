@@ -102,7 +102,7 @@ router.post('/solution/:id/vote',
 // Approve/reject solution (admin/moderator only)
 router.post('/solution/:id/approve',
   authenticate,
-  authorize([UserRole.ADMIN, UserRole.MODERATOR]),
+  authorize(UserRole.ADMIN, UserRole.MODERATOR),
   [
     param('id').isInt().withMessage('Invalid solution ID'),
     body('approved').isBoolean().withMessage('Approved must be a boolean value')

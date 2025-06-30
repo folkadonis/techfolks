@@ -23,6 +23,7 @@ import adminRoutes from './routes/admin.routes';
 import discussionRoutes from './routes/discussion.routes';
 import editorialRoutes from './routes/editorial.routes';
 import teamRoutes from './routes/team.routes';
+import groupsRoutes from './routes/groups.routes';
 
 const app: Application = express();
 
@@ -70,6 +71,11 @@ if (process.env.ENABLE_METRICS === 'true') {
   });
 }
 
+// Test route
+app.get('/api/test', (req: Request, res: Response) => {
+  res.json({ success: true, message: 'Test route works!' });
+});
+
 // API Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
@@ -81,6 +87,7 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/discussions', discussionRoutes);
 app.use('/api/editorials', editorialRoutes);
 app.use('/api/teams', teamRoutes);
+app.use('/api/groups', groupsRoutes);
 
 // 404 handler
 app.use(notFoundHandler);

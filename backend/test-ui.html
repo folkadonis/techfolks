@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TechFolks API Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        h1, h2 {
+            color: #333;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input, textarea, select {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        .response {
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 10px;
+            margin-top: 10px;
+            white-space: pre-wrap;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        .error {
+            background-color: #f8d7da;
+            border-color: #f5c6cb;
+            color: #721c24;
+        }
+        .success {
+            background-color: #d4edda;
+            border-color: #c3e6cb;
+            color: #155724;
+        }
+        .token-info {
+            background-color: #e7f3ff;
+            border: 1px solid #b8daff;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>🚀 TechFolks Competitive Coding Platform</h1>
+    <p>Test your backend API directly from this page!</p>
+
+    <!-- API Health Check -->
+    <div class="container">
+        <h2>🏥 Health Check</h2>
+        <button onclick="checkHealth()">Check API Health</button>
+        <div id="health-response" class="response" style="display: none;"></div>
+    </div>
+
+    <!-- User Registration -->
+    <div class="container">
+        <h2>👤 User Registration</h2>
+        <div class="form-group">
+            <label>Username:</label>
+            <input type="text" id="reg-username" value="testuser2" />
+        </div>
+        <div class="form-group">
+            <label>Email:</label>
+            <input type="email" id="reg-email" value="test2@example.com" />
+        </div>
+        <div class="form-group">
+            <label>Password:</label>
+            <input type="password" id="reg-password" value="Password123!" />
+        </div>
+        <div class="form-group">
+            <label>Full Name:</label>
+            <input type="text" id="reg-fullname" value="Test User 2" />
+        </div>
+        <button onclick="register()">Register User</button>
+        <div id="register-response" class="response" style="display: none;"></div>
+    </div>
+
+    <!-- User Login -->
+    <div class="container">
+        <h2>🔐 User Login</h2>
+        <div class="form-group">
+            <label>Username:</label>
+            <input type="text" id="login-username" value="testuser2" />
+        </div>
+        <div class="form-group">
+            <label>Password:</label>
+            <input type="password" id="login-password" value="Password123!" />
+        </div>
+        <button onclick="login()">Login</button>
+        <div id="login-response" class="response" style="display: none;"></div>
+        <div id="token-display" class="token-info" style="display: none;">
+            <strong>Auth Token:</strong> <span id="auth-token"></span>
+        </div>
+    </div>
+
+    <!-- Create Problem -->
+    <div class="container">
+        <h2>🧩 Create Problem</h2>
+        <div class="form-group">
+            <label>Title:</label>
+            <input type="text" id="problem-title" value="Two Sum" />
+        </div>
+        <div class="form-group">
+            <label>Statement:</label>
+            <textarea id="problem-statement" rows="4">Given an array of integers and a target sum, return indices of two numbers that add up to the target.</textarea>
+        </div>
+        <div class="form-group">
+            <label>Difficulty:</label>
+            <select id="problem-difficulty">
+                <option value="beginner">Beginner</option>
+                <option value="intermediate">Intermediate</option>
+                <option value="advanced">Advanced</option>
+                <option value="expert">Expert</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label>Time Limit (ms):</label>
+            <input type="number" id="problem-time-limit" value="1000" />
+        </div>
+        <div class="form-group">
+            <label>Memory Limit (MB):</label>
+            <input type="number" id="problem-memory-limit" value="256" />
+        </div>
+        <button onclick="createProblem()">Create Problem</button>
+        <div id="problem-response" class="response" style="display: none;"></div>
+    </div>
+
+    <!-- Get Problems -->
+    <div class="container">
+        <h2>📚 View Problems</h2>
+        <button onclick="getProblems()">Get All Problems</button>
+        <div id="problems-response" class="response" style="display: none;"></div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:3000/api';
+        let authToken = '';
+
+        async function makeRequest(url, method = 'GET', body = null, useAuth = false) {
+            const headers = {
+                'Content-Type': 'application/json'
+            };
+            
+            if (useAuth && authToken) {
+                headers['Authorization'] = `Bearer ${authToken}`;
+            }
+
+            try {
+                const response = await fetch(url, {
+                    method,
+                    headers,
+                    body: body ? JSON.stringify(body) : null
+                });
+                
+                const data = await response.json();
+                return { success: response.ok, data, status: response.status };
+            } catch (error) {
+                return { success: false, error: error.message };
+            }
+        }
+
+        function displayResponse(elementId, response, isError = false) {
+            const element = document.getElementById(elementId);
+            element.style.display = 'block';
+            element.className = `response ${isError ? 'error' : 'success'}`;
+            element.textContent = JSON.stringify(response, null, 2);
+        }
+
+        async function checkHealth() {
+            const response = await makeRequest('http://localhost:3000/health');
+            displayResponse('health-response', response.data);
+        }
+
+        async function register() {
+            const userData = {
+                username: document.getElementById('reg-username').value,
+                email: document.getElementById('reg-email').value,
+                password: document.getElementById('reg-password').value,
+                fullName: document.getElementById('reg-fullname').value
+            };
+
+            const response = await makeRequest(`${API_BASE}/auth/register`, 'POST', userData);
+            displayResponse('register-response', response.data, !response.success);
+            
+            if (response.success && response.data.data?.token) {
+                authToken = response.data.data.token;
+                document.getElementById('auth-token').textContent = authToken.substring(0, 50) + '...';
+                document.getElementById('token-display').style.display = 'block';
+            }
+        }
+
+        async function login() {
+            const loginData = {
+                username: document.getElementById('login-username').value,
+                password: document.getElementById('login-password').value
+            };
+
+            const response = await makeRequest(`${API_BASE}/auth/login`, 'POST', loginData);
+            displayResponse('login-response', response.data, !response.success);
+            
+            if (response.success && response.data.data?.token) {
+                authToken = response.data.data.token;
+                document.getElementById('auth-token').textContent = authToken.substring(0, 50) + '...';
+                document.getElementById('token-display').style.display = 'block';
+            }
+        }
+
+        async function createProblem() {
+            if (!authToken) {
+                alert('Please login first to create problems!');
+                return;
+            }
+
+            const problemData = {
+                title: document.getElementById('problem-title').value,
+                statement: document.getElementById('problem-statement').value,
+                difficulty: document.getElementById('problem-difficulty').value,
+                time_limit: parseInt(document.getElementById('problem-time-limit').value),
+                memory_limit: parseInt(document.getElementById('problem-memory-limit').value)
+            };
+
+            const response = await makeRequest(`${API_BASE}/problems`, 'POST', problemData, true);
+            displayResponse('problem-response', response.data, !response.success);
+        }
+
+        async function getProblems() {
+            const response = await makeRequest(`${API_BASE}/problems`);
+            displayResponse('problems-response', response.data, !response.success);
+        }
+    </script>
+</body>
+</html>

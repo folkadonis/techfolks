@@ -253,6 +253,21 @@ class Judge0Service {
   getStatusDescription(statusId: number): string {
     return STATUS_MAP[statusId] || 'Unknown';
   }
+
+  async getSystemInfo(): Promise<any> {
+    try {
+      const response = await axios.get(`${this.baseURL}/system_info`, {
+        headers: {
+          ...(this.authToken && { 'Authorization': `Bearer ${this.authToken}` })
+        },
+        timeout: 5000
+      });
+      return response.data;
+    } catch (error) {
+      logger.error('Judge0 system info error:', error);
+      throw error;
+    }
+  }
 }
 
 export const judge0Service = new Judge0Service();

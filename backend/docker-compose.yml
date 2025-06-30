@@ -1,6 +1,29 @@
 version: '3.8'
 
 services:
+  app:
+    build: .
+    container_name: techfolks_backend
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=development
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_USER=postgres
+      - DB_PASSWORD=postgres
+      - DB_NAME=techfolks_db
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - JUDGE0_API_URL=http://judge0:2358
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./logs:/app/logs
+
   postgres:
     image: postgres:15-alpine
     container_name: techfolks_postgres
@@ -9,7 +32,7 @@ services:
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: techfolks_db
     ports:
-      - "5432:5432"
+      - "5433:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:

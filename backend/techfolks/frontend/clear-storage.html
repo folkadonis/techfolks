@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Clear Storage</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        button {
+            background: #3b82f6;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px 5px;
+        }
+        button:hover {
+            background: #2563eb;
+        }
+        .message {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+        }
+        .success {
+            background: #d1fae5;
+            color: #065f46;
+            border: 1px solid #6ee7b7;
+        }
+        .info {
+            background: #dbeafe;
+            color: #1e40af;
+            border: 1px solid #93c5fd;
+        }
+    </style>
+</head>
+<body>
+    <h1>TechFolks Storage Manager</h1>
+    <p>This page allows you to manage the local storage for the TechFolks application.</p>
+    
+    <div id="message"></div>
+    
+    <button onclick="clearAllStorage()">Clear All Storage</button>
+    <button onclick="clearGroupsOnly()">Clear Groups Only</button>
+    <button onclick="clearProblemsOnly()">Clear Problems Only</button>
+    <button onclick="showCurrentData()">Show Current Data</button>
+    
+    <div id="output"></div>
+
+    <script>
+        function showMessage(text, type = 'info') {
+            const messageDiv = document.getElementById('message');
+            messageDiv.className = `message ${type}`;
+            messageDiv.textContent = text;
+            setTimeout(() => {
+                messageDiv.textContent = '';
+                messageDiv.className = '';
+            }, 3000);
+        }
+
+        function clearAllStorage() {
+            localStorage.clear();
+            showMessage('All storage cleared successfully!', 'success');
+            showCurrentData();
+        }
+
+        function clearGroupsOnly() {
+            localStorage.removeItem('groups-storage');
+            showMessage('Groups data cleared successfully!', 'success');
+            showCurrentData();
+        }
+
+        function clearProblemsOnly() {
+            localStorage.removeItem('problems-storage');
+            showMessage('Problems data cleared successfully!', 'success');
+            showCurrentData();
+        }
+
+        function showCurrentData() {
+            const output = document.getElementById('output');
+            output.innerHTML = '<h3>Current Storage Data:</h3>';
+            
+            if (localStorage.length === 0) {
+                output.innerHTML += '<p>No data in localStorage</p>';
+                return;
+            }
+            
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                const value = localStorage.getItem(key);
+                
+                output.innerHTML += `<div style="margin: 10px 0; padding: 10px; background: #f3f4f6; border-radius: 4px;">
+                    <strong>${key}:</strong><br>
+                    <pre style="overflow-x: auto; font-size: 12px;">${value.substring(0, 200)}${value.length > 200 ? '...' : ''}</pre>
+                </div>`;
+            }
+        }
+
+        // Show current data on load
+        window.onload = showCurrentData;
+    </script>
+</body>
+</html>

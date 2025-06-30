@@ -1,7 +1,7 @@
 import { io, Socket } from 'socket.io-client'
 import { useAuthStore } from '@store/authStore'
 
-const WS_URL = import.meta.env.VITE_WS_URL || 'ws://localhost:8000'
+const WS_URL = (import.meta as any).env?.VITE_WS_URL || 'ws://localhost:8000'
 
 class WebSocketService {
   private socket: Socket | null = null

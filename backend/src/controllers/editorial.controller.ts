@@ -2,7 +2,6 @@ import { Request, Response, NextFunction } from 'express';
 import { AppDataSource } from '../config/database';
 import { AuthRequest } from '../middleware/auth.middleware';
 import { UserRole } from '../types/enums';
-import { marked } from 'marked';
 import DOMPurify from 'isomorphic-dompurify';
 
 export class EditorialController {
@@ -46,8 +45,10 @@ export class EditorialController {
         });
       }
 
-      // Sanitize markdown content
-      const sanitizedContent = DOMPurify.sanitize(marked(content) as string);
+      // Convert markdown to HTML and sanitize
+      const { marked } = await import('marked');
+      const htmlContent = await marked(content);
+      const sanitizedContent = DOMPurify.sanitize(htmlContent);
 
       // Create editorial
       const result = await AppDataSource.query(`
@@ -124,8 +125,10 @@ export class EditorialController {
         });
       }
 
-      // Sanitize markdown content
-      const sanitizedContent = DOMPurify.sanitize(marked(content) as string);
+      // Convert markdown to HTML and sanitize
+      const { marked } = await import('marked');
+      const htmlContent = await marked(content);
+      const sanitizedContent = DOMPurify.sanitize(htmlContent);
 
       // Update editorial
       const updated = await AppDataSource.query(`

@@ -11,6 +11,7 @@ import {
   JoinColumn,
 } from 'typeorm';
 import { User } from './User.entity';
+import { TestCase } from './TestCase.entity';
 
 export enum ProblemDifficulty {
   EASY = 'easy',
@@ -70,9 +71,9 @@ export class Problem {
   @UpdateDateColumn({ name: 'updated_at' })
   updated_at: Date;
 
-  // Relations would be defined here
-  // @OneToMany(() => TestCase, testCase => testCase.problem)
-  // testCases: TestCase[];
+  // Relations
+  @OneToMany(() => TestCase, testCase => testCase.problem, { cascade: true })
+  test_cases: TestCase[];
 
   // @OneToMany(() => Submission, submission => submission.problem)
   // submissions: Submission[];

@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { AppDataSource } from '../config/database';
 import { Problem } from '../models/Problem.entity';
+import { TestCase } from '../models/TestCase.entity';
 import { User } from '../models/User.entity';
 import { UserRole, ProblemDifficulty } from '../types/enums';
 import { AuthRequest } from '../middleware/auth.middleware';
@@ -8,6 +9,7 @@ import { Not } from 'typeorm';
 const slugify = require('slugify');
 
 const problemRepository = AppDataSource.getRepository(Problem);
+const testCaseRepository = AppDataSource.getRepository(TestCase);
 const userRepository = AppDataSource.getRepository(User);
 
 export class ProblemController {
@@ -22,7 +24,8 @@ export class ProblemController {
         difficulty, 
         time_limit = 1000, 
         memory_limit = 256,
-        is_public = false 
+        is_public = false,
+        test_cases = []
       } = req.body;
 
       // Only admins and problem setters can create problems
@@ -60,12 +63,33 @@ export class ProblemController {
         updated_at: new Date()
       });
 
-      await problemRepository.save(problem);
+      const savedProblem = await problemRepository.save(problem);
+
+      // Create test cases if provided
+      if (test_cases && test_cases.length > 0) {
+        const testCaseEntities = test_cases.map((tc: any) => 
+          testCaseRepository.create({
+            problem_id: savedProblem.id,
+            input: tc.input,
+            expected_output: tc.expected_output,
+            is_sample: tc.is_sample || false,
+            points: tc.points || 0
+          })
+        );
+        
+        await testCaseRepository.save(testCaseEntities);
+      }
+
+      // Fetch the complete problem with test cases and author
+      const completeProblem = await problemRepository.findOne({
+        where: { id: savedProblem.id },
+        relations: ['test_cases', 'author']
+      });
 
       res.status(201).json({
         success: true,
         message: 'Problem created successfully',
-        data: problem
+        data: completeProblem
       });
     } catch (error) {
       next(error);
