@@ -1,0 +1,32 @@
+services:
+  - type: web
+    name: techfolks-backend
+    runtime: node
+    repo: https://github.com/folkadonis/techfolks
+    branch: main
+    rootDir: backend
+    buildCommand: npm install && npx tsc || true
+    startCommand: node dist/server.js || npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3000
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JUDGE0_API_URL
+        value: https://ce.judge0.com
+    plan: free
+
+  - type: web
+    name: techfolks-frontend
+    runtime: static
+    repo: https://github.com/folkadonis/techfolks
+    branch: main
+    rootDir: backend/techfolks/frontend
+    buildCommand: npm install && npm run build
+    staticPublishPath: dist
+    envVars:
+      - key: VITE_API_URL
+        value: https://techfolks-backend.onrender.com
+    plan: free
