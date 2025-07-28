@@ -1,0 +1,52 @@
+name: techfolks
+region: nyc
+services:
+- environment_slug: node-js
+  github:
+    branch: main
+    deploy_on_push: true
+    repo: folkadonis/techfolks
+  name: backend
+  source_dir: /backend
+  build_command: npm install && npm run build
+  run_command: npm start
+  http_port: 3000
+  instance_count: 1
+  instance_size_slug: basic-xxs
+  routes:
+  - path: /api
+  envs:
+  - key: NODE_ENV
+    value: production
+  - key: DATABASE_URL
+    scope: RUN_TIME
+    value: ${db.DATABASE_URL}
+  - key: JWT_SECRET
+    scope: RUN_TIME
+    value: your-secret-jwt-key-change-this
+  - key: JUDGE0_API_URL
+    scope: RUN_TIME
+    value: https://ce.judge0.com
+
+static_sites:
+- environment_slug: html
+  github:
+    branch: main
+    deploy_on_push: true
+    repo: folkadonis/techfolks
+  name: frontend
+  source_dir: /backend/techfolks/frontend
+  build_command: npm install && npm run build
+  output_dir: dist
+  routes:
+  - path: /
+  envs:
+  - key: VITE_API_URL
+    scope: BUILD_TIME
+    value: ${APP_URL}/api
+
+databases:
+- engine: PG
+  name: db
+  production: false
+  version: "15"
