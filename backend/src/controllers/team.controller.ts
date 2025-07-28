@@ -383,7 +383,7 @@ export class TeamController {
       }
 
       // Cannot change own role
-      if (parseInt(user_id) === requesterId) {
+      if (user_id === requesterId) {
         return res.status(400).json({
           success: false,
           message: 'You cannot change your own role'

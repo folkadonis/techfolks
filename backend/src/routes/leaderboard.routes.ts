@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { query } from 'express-validator';
-import { validationMiddleware } from '../middleware/validation.middleware';
+import { validate } from '../middleware/validation.middleware';
 import * as leaderboardController from '../controllers/leaderboard.controller';
 
 const router = Router();
@@ -91,7 +91,7 @@ router.get('/global',
   query('timeFrame').optional().isIn(['all-time', 'monthly', 'weekly']),
   query('category').optional().isIn(['rating', 'problems', 'contests']),
   query('search').optional().isString().trim(),
-  validationMiddleware,
+  validate,
   leaderboardController.getGlobalLeaderboard
 );
 
@@ -119,7 +119,7 @@ router.get('/global',
 router.get('/weekly',
   query('page').optional().isInt({ min: 1 }),
   query('limit').optional().isInt({ min: 1, max: 100 }),
-  validationMiddleware,
+  validate,
   leaderboardController.getWeeklyLeaderboard
 );
 
@@ -147,7 +147,7 @@ router.get('/weekly',
 router.get('/monthly',
   query('page').optional().isInt({ min: 1 }),
   query('limit').optional().isInt({ min: 1, max: 100 }),
-  validationMiddleware,
+  validate,
   leaderboardController.getMonthlyLeaderboard
 );
 

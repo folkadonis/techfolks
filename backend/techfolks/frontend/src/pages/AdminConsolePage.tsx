@@ -10,25 +10,31 @@ import toast from 'react-hot-toast'
 interface SystemStats {
   total_users: number
   active_users: number
+  admin_users: number
+  verified_users: number
   total_problems: number
   total_contests: number
-  total_groups: number
   total_submissions: number
-  server_uptime: string
+  server_uptime: number
   memory_usage: number
   cpu_usage: number
 }
 
 interface User {
-  id: number
+  id: string
   username: string
   email: string
-  role: 'admin' | 'user'
+  full_name?: string
+  role: 'admin' | 'user' | 'problem_setter' | 'moderator'
   rating: number
+  max_rating: number
   problems_solved: number
+  contests_participated_count: number
   created_at: string
-  last_active: string
+  last_login?: string
   is_banned: boolean
+  is_verified: boolean
+  is_active: boolean
 }
 
 const AdminConsolePage = () => {
@@ -41,7 +47,7 @@ const AdminConsolePage = () => {
   const [stats, setStats] = useState<SystemStats | null>(null)
   const [users, setUsers] = useState<User[]>([])
   const [searchQuery, setSearchQuery] = useState('')
-  const [selectedUsers, setSelectedUsers] = useState<number[]>([])
+  const [selectedUsers, setSelectedUsers] = useState<string[]>([])
 
   // Redirect if not admin
   if (!user || user.role !== 'admin') {
@@ -55,8 +61,8 @@ const AdminConsolePage = () => {
 
   const fetchSystemStats = async () => {
     try {
-      const data = await adminAPI.getSystemStats()
-      setStats(data)
+      const response = await adminAPI.getSystemStats()
+      setStats(response.data)
     } catch (error) {
       console.error('Error fetching system stats:', error)
       toast.error('Error loading system statistics')
@@ -65,15 +71,15 @@ const AdminConsolePage = () => {
 
   const fetchUsers = async () => {
     try {
-      const data = await adminAPI.getUsers()
-      setUsers(data.users || [])
+      const response = await adminAPI.getUsers()
+      setUsers(response.data?.users || [])
     } catch (error) {
       console.error('Error fetching users:', error)
       toast.error('Error loading users')
     }
   }
 
-  const handleBanUser = async (userId: number, ban: boolean) => {
+  const handleBanUser = async (userId: string, ban: boolean) => {
     try {
       const response = await fetch(`/api/admin/users/${userId}/${ban ? 'ban' : 'unban'}`, {
         method: 'PUT'
@@ -291,7 +297,7 @@ const AdminConsolePage = () => {
               <div>
                 <div className="text-sm font-medium mb-2">Server Uptime</div>
                 <div className="text-lg font-bold text-green-600 dark:text-green-400">
-                  {stats.server_uptime}
+                  {Math.round(stats.server_uptime)}s
                 </div>
               </div>
             </div>

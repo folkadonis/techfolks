@@ -1,7 +1,8 @@
 import { Router } from 'express';
 import { ProblemController } from '../controllers/problem.controller';
+import { SubmissionController } from '../controllers/submission.controller';
 import { authenticate, authorize, optionalAuth } from '../middleware/auth.middleware';
-import { problemValidationRules, validate } from '../middleware/validation.middleware';
+import { problemValidationRules, submissionValidationRules, validate } from '../middleware/validation.middleware';
 import { UserRole } from '../types/enums';
 
 const router = Router();
@@ -232,6 +233,85 @@ router.delete(
   authenticate,
   authorize(UserRole.ADMIN),
   ProblemController.deleteProblem
+);
+
+/**
+ * @swagger
+ * /problems/{id}/submit:
+ *   post:
+ *     summary: Submit solution for a problem
+ *     tags: [Problems]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - code
+ *               - language
+ *             properties:
+ *               code:
+ *                 type: string
+ *               language:
+ *                 type: string
+ *                 enum: [cpp, python, java, javascript, c, go, rust, csharp]
+ *     responses:
+ *       201:
+ *         description: Submission created successfully
+ *       404:
+ *         description: Problem not found
+ */
+router.post(
+  '/:id/submit',
+  authenticate,
+  submissionValidationRules.create,
+  validate,
+  SubmissionController.submitSolution
+);
+
+/**
+ * @swagger
+ * /problems/{id}/submissions:
+ *   get:
+ *     summary: Get submissions for a problem
+ *     tags: [Problems]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 20
+ *     responses:
+ *       200:
+ *         description: List of submissions for the problem
+ *       404:
+ *         description: Problem not found
+ */
+router.get(
+  '/:id/submissions',
+  authenticate,
+  SubmissionController.getProblemSubmissions
 );
 
 export default router;

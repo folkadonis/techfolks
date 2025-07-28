@@ -6,18 +6,34 @@ const redisConfig = {
   port: parseInt(process.env.REDIS_PORT || '6379'),
   password: process.env.REDIS_PASSWORD,
   db: parseInt(process.env.REDIS_DB || '0'),
+  
+  // Enhanced connection settings for production
+  connectTimeout: parseInt(process.env.REDIS_CONNECT_TIMEOUT || '10000'),
+  commandTimeout: parseInt(process.env.REDIS_COMMAND_TIMEOUT || '5000'),
+  lazyConnect: true,
+  keepAlive: 30000,
+  
+  // Connection pool settings
+  maxRetriesPerRequest: 3,
+  retryDelayOnFailover: 100,
+  enableReadyCheck: true,
+  maxConnections: parseInt(process.env.REDIS_MAX_CONNECTIONS || '50'),
+  
+  // Retry strategy with exponential backoff
   retryStrategy: (times: number) => {
     const delay = Math.min(times * 50, 2000);
     return delay;
   },
+  
+  // Reconnection settings
   reconnectOnError: (err: Error) => {
-    const targetError = 'READONLY';
-    if (err.message.includes(targetError)) {
-      return true;
-    }
-    return false;
+    const targetErrors = ['READONLY', 'ECONNRESET', 'EPIPE', 'ETIMEDOUT'];
+    return targetErrors.some(target => err.message.includes(target));
   },
-  maxRetriesPerRequest: 3,
+  
+  // Performance settings
+  maxMemoryPolicy: 'allkeys-lru',
+  family: 4,
 };
 
 // Create Redis client

@@ -1,0 +1,185 @@
+# TechFolks Production Alerting Rules
+groups:
+  - name: techfolks.application
+    rules:
+      # High Error Rate Alert
+      - alert: HighErrorRate
+        expr: rate(http_request_errors_total[5m]) > 0.05
+        for: 2m
+        labels:
+          severity: critical
+          service: techfolks-backend
+        annotations:
+          summary: "High error rate detected"
+          description: "Error rate is {{ $value | humanizePercentage }} for the last 5 minutes"
+
+      # High Response Time Alert
+      - alert: HighResponseTime
+        expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m])) > 2
+        for: 5m
+        labels:
+          severity: warning
+          service: techfolks-backend
+        annotations:
+          summary: "High response time detected"
+          description: "95th percentile response time is {{ $value }}s"
+
+      # Database Connection Pool Alert
+      - alert: DatabaseConnectionsHigh
+        expr: (db_pool_connections_active / db_pool_connections_total) > 0.8
+        for: 5m
+        labels:
+          severity: warning
+          service: techfolks-database
+        annotations:
+          summary: "High database connection pool utilization"
+          description: "Database connection pool utilization is {{ $value | humanizePercentage }}"
+
+      # Queue Depth Alert
+      - alert: QueueDepthHigh
+        expr: submission_queue_depth{status="waiting"} > 100
+        for: 10m
+        labels:
+          severity: warning
+          service: techfolks-queue
+        annotations:
+          summary: "High submission queue depth"
+          description: "Submission queue has {{ $value }} waiting jobs"
+
+      # Memory Usage Alert
+      - alert: HighMemoryUsage
+        expr: (process_resident_memory_bytes / 1024 / 1024) > 1024
+        for: 10m
+        labels:
+          severity: warning
+          service: techfolks-backend
+        annotations:
+          summary: "High memory usage"
+          description: "Memory usage is {{ $value }}MB"
+
+      # CPU Usage Alert
+      - alert: HighCPUUsage
+        expr: rate(process_cpu_seconds_total[5m]) > 0.8
+        for: 15m
+        labels:
+          severity: warning
+          service: techfolks-backend
+        annotations:
+          summary: "High CPU usage"
+          description: "CPU usage is {{ $value | humanizePercentage }}"
+
+  - name: techfolks.infrastructure
+    rules:
+      # Redis Connection Alert
+      - alert: RedisDown
+        expr: redis_up == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: techfolks-redis
+        annotations:
+          summary: "Redis is down"
+          description: "Redis instance is not responding"
+
+      # Database Connection Alert
+      - alert: DatabaseDown
+        expr: db_healthy == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: techfolks-database
+        annotations:
+          summary: "Database is down"
+          description: "Database connection is not healthy"
+
+      # Judge0 Cluster Alert
+      - alert: Judge0InstancesDown
+        expr: (judge0_healthy_instances / judge0_total_instances) < 0.5
+        for: 2m
+        labels:
+          severity: critical
+          service: techfolks-judge0
+        annotations:
+          summary: "Multiple Judge0 instances down"
+          description: "Only {{ $value | humanizePercentage }} of Judge0 instances are healthy"
+
+      # Disk Space Alert
+      - alert: LowDiskSpace
+        expr: (node_filesystem_avail_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"}) < 0.1
+        for: 5m
+        labels:
+          severity: critical
+          service: techfolks-infrastructure
+        annotations:
+          summary: "Low disk space"
+          description: "Disk space is {{ $value | humanizePercentage }} full"
+
+  - name: techfolks.business
+    rules:
+      # Submission Processing Failure Rate
+      - alert: HighSubmissionFailureRate
+        expr: rate(submissions_failed_total[10m]) / rate(submissions_total[10m]) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+          service: techfolks-business
+        annotations:
+          summary: "High submission failure rate"
+          description: "Submission failure rate is {{ $value | humanizePercentage }}"
+
+      # Low Submission Throughput
+      - alert: LowSubmissionThroughput
+        expr: rate(submissions_processed_total[10m]) < 0.1
+        for: 15m
+        labels:
+          severity: warning
+          service: techfolks-business
+        annotations:
+          summary: "Low submission throughput"
+          description: "Submission processing rate is {{ $value }} per second"
+
+      # User Registration Issues
+      - alert: UserRegistrationFailures
+        expr: rate(user_registrations_failed_total[5m]) > rate(user_registrations_successful_total[5m])
+        for: 10m
+        labels:
+          severity: warning
+          service: techfolks-auth
+        annotations:
+          summary: "High user registration failure rate"
+          description: "User registration failures exceed successful registrations"
+
+  - name: techfolks.security
+    rules:
+      # Authentication Failure Spike
+      - alert: AuthenticationFailureSpike
+        expr: rate(auth_failures_total[5m]) > 10
+        for: 2m
+        labels:
+          severity: warning
+          service: techfolks-security
+        annotations:
+          summary: "High authentication failure rate"
+          description: "Authentication failures: {{ $value }} per second"
+
+      # Rate Limit Violations
+      - alert: RateLimitViolations
+        expr: rate(rate_limit_exceeded_total[5m]) > 50
+        for: 5m
+        labels:
+          severity: warning
+          service: techfolks-security
+        annotations:
+          summary: "High rate limit violations"
+          description: "Rate limit violations: {{ $value }} per second"
+
+      # Suspicious Activity
+      - alert: SuspiciousActivity
+        expr: rate(http_requests_total{status=~"4[0-9][0-9]"}[5m]) > 100
+        for: 3m
+        labels:
+          severity: warning
+          service: techfolks-security
+        annotations:
+          summary: "Suspicious activity detected"
+          description: "High rate of 4xx errors: {{ $value }} per second"

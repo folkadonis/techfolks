@@ -102,7 +102,7 @@ export class ProblemController {
       const updates = req.body;
 
       const problem = await problemRepository.findOne({
-        where: { id: parseInt(id) },
+        where: { id: id },
         relations: ['author']
       });
 
@@ -155,7 +155,7 @@ export class ProblemController {
       const { id } = req.params;
 
       const problem = await problemRepository.findOne({
-        where: { id: parseInt(id) }
+        where: { id: id }
       });
 
       if (!problem) {

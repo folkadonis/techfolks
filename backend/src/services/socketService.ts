@@ -5,9 +5,9 @@ import { logger } from '../utils/logger';
 
 class SocketService {
   private io: Server | null = null;
-  private userSockets: Map<number, Set<string>> = new Map();
-  private contestRooms: Map<number, Set<string>> = new Map();
-  private teamRooms: Map<number, Set<string>> = new Map();
+  private userSockets: Map<string, Set<string>> = new Map();
+  private contestRooms: Map<string, Set<string>> = new Map();
+  private teamRooms: Map<string, Set<string>> = new Map();
 
   initialize(server: HTTPServer) {
     this.io = new Server(server, {
@@ -28,7 +28,7 @@ class SocketService {
         const decoded = jwt.verify(
           token,
           process.env.JWT_SECRET || 'your-secret-key'
-        ) as { userId: number; username: string };
+        ) as { userId: string; username: string };
 
         socket.data.userId = decoded.userId;
         socket.data.username = decoded.username;
@@ -50,7 +50,7 @@ class SocketService {
       this.userSockets.get(userId)!.add(socket.id);
 
       // Handle joining contest rooms
-      socket.on('join-contest', (contestId: number) => {
+      socket.on('join-contest', (contestId: string) => {
         socket.join(`contest-${contestId}`);
         if (!this.contestRooms.has(contestId)) {
           this.contestRooms.set(contestId, new Set());
@@ -60,14 +60,14 @@ class SocketService {
       });
 
       // Handle leaving contest rooms
-      socket.on('leave-contest', (contestId: number) => {
+      socket.on('leave-contest', (contestId: string) => {
         socket.leave(`contest-${contestId}`);
         this.contestRooms.get(contestId)?.delete(socket.id);
         logger.info(`User ${userId} left contest ${contestId}`);
       });
 
       // Handle joining team rooms
-      socket.on('join-team', (teamId: number) => {
+      socket.on('join-team', (teamId: string) => {
         socket.join(`team-${teamId}`);
         if (!this.teamRooms.has(teamId)) {
           this.teamRooms.set(teamId, new Set());
@@ -77,7 +77,7 @@ class SocketService {
       });
 
       // Handle leaving team rooms
-      socket.on('leave-team', (teamId: number) => {
+      socket.on('leave-team', (teamId: string) => {
         socket.leave(`team-${teamId}`);
         this.teamRooms.get(teamId)?.delete(socket.id);
         logger.info(`User ${userId} left team ${teamId}`);
@@ -117,7 +117,7 @@ class SocketService {
   }
 
   // Emit to specific user
-  emitToUser(userId: number, event: string, data: any) {
+  emitToUser(userId: string, event: string, data: any) {
     const userSockets = this.userSockets.get(userId);
     if (userSockets && this.io) {
       userSockets.forEach(socketId => {
@@ -127,14 +127,14 @@ class SocketService {
   }
 
   // Emit to all users in a contest
-  emitToContest(contestId: number, event: string, data: any) {
+  emitToContest(contestId: string, event: string, data: any) {
     if (this.io) {
       this.io.to(`contest-${contestId}`).emit(event, data);
     }
   }
 
   // Emit to all users in a team
-  emitToTeam(teamId: number, event: string, data: any) {
+  emitToTeam(teamId: string, event: string, data: any) {
     if (this.io) {
       this.io.to(`team-${teamId}`).emit(event, data);
     }

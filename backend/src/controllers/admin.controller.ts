@@ -3,6 +3,7 @@ import { AppDataSource } from '../config/database';
 import { User } from '../models/User.entity';
 import { UserRole } from '../types/enums';
 import { AuthRequest } from '../middleware/auth.middleware';
+import { MoreThan } from 'typeorm';
 
 export class AdminController {
   static async getAllUsers(req: AuthRequest, res: Response, next: NextFunction) {
@@ -42,7 +43,7 @@ export class AdminController {
       }
 
       const user = await userRepository.findOne({
-        where: { id: parseInt(id) }
+        where: { id: id }
       });
 
       if (!user) {
@@ -106,7 +107,7 @@ export class AdminController {
       const userRepository = AppDataSource.getRepository(User);
 
       const user = await userRepository.findOne({
-        where: { id: parseInt(id) }
+        where: { id: id }
       });
 
       if (!user) {
@@ -134,7 +135,7 @@ export class AdminController {
       const userRepository = AppDataSource.getRepository(User);
 
       const user = await userRepository.findOne({
-        where: { id: parseInt(id) }
+        where: { id: id }
       });
 
       if (!user) {
@@ -162,7 +163,7 @@ export class AdminController {
       const userRepository = AppDataSource.getRepository(User);
 
       const user = await userRepository.findOne({
-        where: { id: parseInt(id) }
+        where: { id: id }
       });
 
       if (!user) {
@@ -202,7 +203,7 @@ export class AdminController {
         verifiedUsers
       ] = await Promise.all([
         userRepository.count(),
-        userRepository.count({ where: { last_login: { $gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) } as any } }),
+        userRepository.count({ where: { last_login: MoreThan(new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)) } }),
         userRepository.count({ where: { role: UserRole.ADMIN } }),
         userRepository.count({ where: { is_verified: true } })
       ]);

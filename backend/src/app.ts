@@ -3,9 +3,10 @@ import cors from 'cors';
 import helmet from 'helmet';
 import compression from 'compression';
 import 'express-async-errors';
-import swaggerUi from 'swagger-ui-express';
-import { swaggerSpec } from './config/swagger';
+// import swaggerUi from 'swagger-ui-express';
+// import { swaggerSpec } from './config/swagger';
 import { corsOptions } from './config/cors';
+import { validateEnvironment } from './utils/environment';
 import { rateLimiter } from './middleware/rateLimiter';
 import { errorHandler } from './middleware/errorHandler';
 import { requestLogger } from './middleware/requestLogger';
@@ -18,12 +19,16 @@ import userRoutes from './routes/user.routes';
 import problemRoutes from './routes/problem.routes';
 import submissionRoutes from './routes/submission.routes';
 import contestRoutes from './routes/contest.routes';
-import leaderboardRoutes from './routes/leaderboard.routes';
+// import leaderboardRoutes from './routes/leaderboard.routes';
+// import dashboardRoutes from './routes/dashboard.routes';
 import adminRoutes from './routes/admin.routes';
 import discussionRoutes from './routes/discussion.routes';
 import editorialRoutes from './routes/editorial.routes';
 import teamRoutes from './routes/team.routes';
 import groupsRoutes from './routes/groups.routes';
+
+// Validate environment variables before starting
+validateEnvironment();
 
 const app: Application = express();
 
@@ -48,7 +53,7 @@ if (process.env.ENABLE_METRICS === 'true') {
 app.use('/api/', rateLimiter);
 
 // API Documentation
-app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+// app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
 // Health check endpoint
 app.get('/health', async (req: Request, res: Response) => {
@@ -82,7 +87,8 @@ app.use('/api/users', userRoutes);
 app.use('/api/problems', problemRoutes);
 app.use('/api/submissions', submissionRoutes);
 app.use('/api/contests', contestRoutes);
-app.use('/api/leaderboard', leaderboardRoutes);
+// app.use('/api/leaderboard', leaderboardRoutes);
+// app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/discussions', discussionRoutes);
 app.use('/api/editorials', editorialRoutes);

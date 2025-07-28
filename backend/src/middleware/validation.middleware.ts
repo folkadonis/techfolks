@@ -88,8 +88,8 @@ export const contestValidationRules = {
 export const submissionValidationRules = {
   create: [
     body('problem_id')
-      .isInt()
-      .withMessage('Problem ID must be a valid integer'),
+      .isUUID()
+      .withMessage('Problem ID must be a valid UUID'),
     body('language')
       .isIn(['c', 'cpp', 'java', 'python', 'javascript', 'go', 'rust', 'csharp'])
       .withMessage('Invalid programming language'),

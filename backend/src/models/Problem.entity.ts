@@ -21,8 +21,8 @@ export enum ProblemDifficulty {
 
 @Entity('problems')
 export class Problem {
-  @PrimaryGeneratedColumn()
-  id: number;
+  @PrimaryGeneratedColumn('uuid')
+  id: string;
 
   @Column({ length: 255 })
   title: string;
@@ -56,7 +56,7 @@ export class Problem {
   memory_limit: number; // in MB
 
   @Column({ name: 'author_id', nullable: true })
-  author_id: number;
+  author_id: string;
 
   @ManyToOne(() => User)
   @JoinColumn({ name: 'author_id' })

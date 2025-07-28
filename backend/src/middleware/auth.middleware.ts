@@ -4,7 +4,7 @@ import { UserRole } from '../types/enums';
 
 export interface AuthRequest extends Request {
   user?: {
-    userId: number;
+    userId: string;
     username: string;
     role: UserRole;
   };
@@ -23,10 +23,13 @@ export const authenticate = (req: AuthRequest, res: Response, next: NextFunction
 
     const token = authHeader.substring(7);
     
-    const decoded = jwt.verify(
-      token,
-      process.env.JWT_SECRET || 'your-secret-key'
-    ) as { userId: number; username: string; role: UserRole };
+    // Ensure JWT_SECRET is set and secure
+    const jwtSecret = process.env.JWT_SECRET;
+    if (!jwtSecret || jwtSecret.length < 32) {
+      throw new Error('JWT_SECRET must be set and at least 32 characters long');
+    }
+    
+    const decoded = jwt.verify(token, jwtSecret) as { userId: string; username: string; role: UserRole };
 
     req.user = decoded;
     next();
@@ -75,10 +78,12 @@ export const optionalAuth = (req: AuthRequest, res: Response, next: NextFunction
 
     const token = authHeader.substring(7);
     
-    const decoded = jwt.verify(
-      token,
-      process.env.JWT_SECRET || 'your-secret-key'
-    ) as { userId: number; username: string; role: UserRole };
+    const jwtSecret = process.env.JWT_SECRET;
+    if (!jwtSecret || jwtSecret.length < 32) {
+      return next();
+    }
+    
+    const decoded = jwt.verify(token, jwtSecret) as { userId: string; username: string; role: UserRole };
 
     req.user = decoded;
     next();

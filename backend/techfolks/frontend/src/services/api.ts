@@ -2,7 +2,7 @@ import axios, { AxiosError, AxiosInstance, AxiosRequestConfig } from 'axios'
 import { useAuthStore } from '@store/authStore'
 import toast from 'react-hot-toast'
 
-const API_URL = (import.meta as any).env?.VITE_API_URL || 'http://localhost:5000/api'
+const API_URL = (import.meta as any).env?.VITE_API_URL || 'http://localhost:3000/api'
 
 class ApiService {
   private api: AxiosInstance
@@ -118,8 +118,9 @@ export const contestsAPI = {
 }
 
 export const userAPI = {
-  getProfile: (username: string) => apiService.get(`/users/${username}`),
-  updateProfile: (data: any) => apiService.patch('/users/me', data),
+  getProfile: () => apiService.get('/users/profile'),
+  updateProfile: (data: any) => apiService.put('/users/profile', data),
+  getUserById: (id: string) => apiService.get(`/users/${id}`),
   getSubmissions: (userId?: string) =>
     apiService.get(userId ? `/users/${userId}/submissions` : '/users/me/submissions'),
   getStats: (userId?: string) =>
@@ -146,6 +147,7 @@ export const groupsAPI = {
   removeMember: (id: string, userId: string) => apiService.delete(`/groups/${id}/members/${userId}`),
   promoteMember: (id: string, userId: string) => apiService.post(`/groups/${id}/members/${userId}/promote`),
   demoteMember: (id: string, userId: string) => apiService.post(`/groups/${id}/members/${userId}/demote`),
+  createContest: (id: string, data: any) => apiService.post(`/groups/${id}/contests`, data),
 }
 
 export const dashboardAPI = {

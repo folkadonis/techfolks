@@ -4,6 +4,7 @@ import { useAuthStore } from '@store/authStore'
 import { useContestsStore } from '@store/contestsStore'
 import { useProblemsStore } from '@store/problemsStore'
 import { useGroupsStore } from '@store/groupsStore'
+import { groupsAPI } from '@services/api'
 import toast from 'react-hot-toast'
 
 interface ContestFormData {
@@ -107,25 +108,31 @@ const CreateGroupContestPage = () => {
       const endDate = new Date(formData.end_time)
       const duration = Math.floor((endDate.getTime() - startDate.getTime()) / (1000 * 60))
       
-      // Create new contest
-      const newContest = {
-        id: Date.now(),
+      // Create contest data for backend
+      const contestData = {
         title: formData.title,
         description: formData.description,
+        contest_type: formData.type.replace('-', '_').toUpperCase(), // Convert ACM-ICPC to ACM_ICPC
         start_time: formData.start_time,
         end_time: formData.end_time,
+        registration_open: true,
+        problem_ids: [] // TODO: Add problem selection
+      }
+      
+      // Call backend API to create contest
+      const response = await groupsAPI.createContest(groupId!, contestData)
+      
+      // Also add to local store for immediate UI update
+      const newContest = {
+        ...response.data,
         duration,
         status: 'upcoming' as const,
         problems: formData.problem_codes,
         participants: 0,
-        created_by: user?.username || 'admin',
-        created_at: new Date().toISOString(),
-        is_public: false, // Group contests are private by default
         group_id: parseInt(groupId!),
         group_name: group?.name
       }
       
-      // Add to store
       addContest(newContest)
       
       toast.success('Contest created successfully!')

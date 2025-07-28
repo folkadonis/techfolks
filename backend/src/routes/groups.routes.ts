@@ -1,8 +1,9 @@
 import { Router } from 'express';
 import { body, param, query } from 'express-validator';
-import { authMiddleware } from '../middleware/auth.middleware';
-import { validationMiddleware } from '../middleware/validation.middleware';
+import { authenticate } from '../middleware/auth.middleware';
+import { validate, contestValidationRules } from '../middleware/validation.middleware';
 import * as groupsController from '../controllers/groups.controller';
+import { ContestController } from '../controllers/contest.controller';
 
 const router = Router();
 
@@ -82,7 +83,7 @@ router.get('/',
   query('page').optional().isInt({ min: 1 }),
   query('limit').optional().isInt({ min: 1, max: 100 }),
   query('search').optional().isString().trim(),
-  validationMiddleware,
+  validate,
   groupsController.getGroups
 );
 
@@ -98,7 +99,7 @@ router.get('/',
  *       200:
  *         description: User's groups
  */
-router.get('/my', authMiddleware, groupsController.getUserGroups);
+router.get('/my', authenticate, groupsController.getUserGroups);
 
 /**
  * @swagger
@@ -121,7 +122,7 @@ router.get('/my', authMiddleware, groupsController.getUserGroups);
  */
 router.get('/:id',
   param('id').isUUID(),
-  validationMiddleware,
+  validate,
   groupsController.getGroupById
 );
 
@@ -160,7 +161,7 @@ router.get('/:id',
  *         description: Validation error
  */
 router.post('/',
-  authMiddleware,
+  authenticate,
   body('name')
     .isString()
     .trim()
@@ -175,7 +176,7 @@ router.post('/',
     .optional()
     .isBoolean()
     .withMessage('is_private must be a boolean'),
-  validationMiddleware,
+  validate,
   groupsController.createGroup
 );
 
@@ -219,7 +220,7 @@ router.post('/',
  *         description: Group not found
  */
 router.put('/:id',
-  authMiddleware,
+  authenticate,
   param('id').isUUID(),
   body('name')
     .optional()
@@ -234,7 +235,7 @@ router.put('/:id',
   body('is_private')
     .optional()
     .isBoolean(),
-  validationMiddleware,
+  validate,
   groupsController.updateGroup
 );
 
@@ -262,9 +263,9 @@ router.put('/:id',
  *         description: Group not found
  */
 router.delete('/:id',
-  authMiddleware,
+  authenticate,
   param('id').isUUID(),
-  validationMiddleware,
+  validate,
   groupsController.deleteGroup
 );
 
@@ -291,9 +292,9 @@ router.delete('/:id',
  *         description: Group not found
  */
 router.post('/join/:code',
-  authMiddleware,
+  authenticate,
   param('code').isString().trim().isLength({ min: 6, max: 10 }),
-  validationMiddleware,
+  validate,
   groupsController.joinGroup
 );
 
@@ -321,9 +322,9 @@ router.post('/join/:code',
  *         description: Group not found
  */
 router.post('/:id/leave',
-  authMiddleware,
+  authenticate,
   param('id').isUUID(),
-  validationMiddleware,
+  validate,
   groupsController.leaveGroup
 );
 
@@ -351,9 +352,9 @@ router.post('/:id/leave',
  *         description: Group not found
  */
 router.get('/:id/members',
-  authMiddleware,
+  authenticate,
   param('id').isUUID(),
-  validationMiddleware,
+  validate,
   groupsController.getGroupMembers
 );
 
@@ -387,10 +388,10 @@ router.get('/:id/members',
  *         description: Group or member not found
  */
 router.delete('/:id/members/:userId',
-  authMiddleware,
+  authenticate,
   param('id').isUUID(),
   param('userId').isUUID(),
-  validationMiddleware,
+  validate,
   groupsController.removeMember
 );
 
@@ -424,10 +425,10 @@ router.delete('/:id/members/:userId',
  *         description: Group or member not found
  */
 router.post('/:id/members/:userId/promote',
-  authMiddleware,
+  authenticate,
   param('id').isUUID(),
   param('userId').isUUID(),
-  validationMiddleware,
+  validate,
   groupsController.promoteMember
 );
 
@@ -461,11 +462,71 @@ router.post('/:id/members/:userId/promote',
  *         description: Group or member not found
  */
 router.post('/:id/members/:userId/demote',
-  authMiddleware,
+  authenticate,
   param('id').isUUID(),
   param('userId').isUUID(),
-  validationMiddleware,
+  validate,
   groupsController.demoteMember
+);
+
+/**
+ * @swagger
+ * /api/groups/{id}/contests:
+ *   post:
+ *     summary: Create a contest for the group (owner/manager only)
+ *     tags: [Groups]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - title
+ *               - contest_type
+ *               - start_time
+ *               - end_time
+ *             properties:
+ *               title:
+ *                 type: string
+ *               description:
+ *                 type: string
+ *               contest_type:
+ *                 type: string
+ *                 enum: [ACM_ICPC, IOI, AtCoder, CodeForces]
+ *               start_time:
+ *                 type: string
+ *                 format: date-time
+ *               end_time:
+ *                 type: string
+ *                 format: date-time
+ *               problem_ids:
+ *                 type: array
+ *                 items:
+ *                   type: integer
+ *     responses:
+ *       201:
+ *         description: Contest created successfully
+ *       403:
+ *         description: Only group owners and managers can create contests
+ *       404:
+ *         description: Group not found
+ */
+router.post('/:id/contests',
+  authenticate,
+  param('id').isUUID(),
+  contestValidationRules.create,
+  validate,
+  ContestController.createGroupContest
 );
 
 export default router;

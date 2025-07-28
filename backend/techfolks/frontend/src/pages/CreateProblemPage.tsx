@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuthStore } from '@store/authStore'
 import { useProblemsStore } from '@store/problemsStore'
+import { problemsAPI } from '@services/api'
 import toast from 'react-hot-toast'
 
 interface TestCase {
@@ -144,13 +145,8 @@ const CreateProblemPage = () => {
 
     setLoading(true)
     try {
-      // Generate unique problem code
-      const problemCode = generateUniqueCode()
-      
-      // Create new problem with author automatically set
-      const newProblem = {
-        id: Date.now(),
-        code: problemCode,
+      // Prepare problem data for API
+      const problemData = {
         title: formData.title,
         statement: formData.statement,
         input_format: formData.input_format,
@@ -161,26 +157,34 @@ const CreateProblemPage = () => {
         memory_limit: formData.memory_limit,
         is_public: formData.is_public,
         tags: formData.tags.split(',').map(tag => tag.trim()).filter(tag => tag),
-        test_cases: formData.test_cases,
-        author: {
-          id: user?.id || 'unknown',
-          username: user?.username || 'Unknown',
-          email: user?.email || ''
-        },
-        created_by: user?.username || 'Unknown',
-        created_at: new Date().toISOString(),
+        test_cases: formData.test_cases.map(tc => ({
+          input: tc.input,
+          expected_output: tc.expected_output,
+          is_sample: tc.is_sample,
+          points: tc.points
+        }))
+      }
+      
+      // Call backend API to create problem
+      const response = await problemsAPI.create(problemData)
+      const createdProblem = response.data
+      
+      // Also add to local store for immediate UI update
+      const newProblem = {
+        ...createdProblem,
+        tags: formData.tags.split(',').map(tag => tag.trim()).filter(tag => tag),
         solved_count: 0,
         attempted_count: 0
       }
       
-      // Add to store
       addProblem(newProblem)
       
-      toast.success(`Problem created successfully! Code: ${problemCode}`)
-      navigate(`/problems/${newProblem.id}`)
+      toast.success(`Problem created successfully!`)
+      navigate('/problems')
     } catch (error: any) {
       console.error('Error creating problem:', error)
-      toast.error('Failed to create problem')
+      const errorMessage = error?.response?.data?.message || error?.message || 'Failed to create problem'
+      toast.error(errorMessage)
     } finally {
       setLoading(false)
     }

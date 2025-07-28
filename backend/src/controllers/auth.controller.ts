@@ -183,7 +183,7 @@ export class AuthController {
       const decoded = jwt.verify(
         refreshToken,
         process.env.JWT_REFRESH_SECRET || 'your-refresh-secret-key'
-      ) as { userId: number };
+      ) as { userId: string };
 
       const user = await userRepository.findOne({
         where: { id: decoded.userId }

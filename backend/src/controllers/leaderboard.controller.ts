@@ -1,13 +1,13 @@
 import { Request, Response } from 'express';
 import { pgPool } from '../config/database';
 import { logger } from '../utils/logger';
+import { UserRole } from '../types/enums';
 
 interface AuthenticatedRequest extends Request {
   user?: {
-    id: string;
+    userId: string;
     username: string;
-    email: string;
-    role: string;
+    role: UserRole;
   };
 }
 

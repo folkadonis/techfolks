@@ -1,350 +1,293 @@
-# 🚀 TechFolks Production Deployment Guide
+# TechFolks Production Deployment Guide
 
-This guide covers deploying the TechFolks platform in a production environment with real database tables and API integration.
+## Table of Contents
+1. [Prerequisites](#prerequisites)
+2. [Infrastructure Setup](#infrastructure-setup)
+3. [Security Configuration](#security-configuration)
+4. [Database Setup](#database-setup)
+5. [Application Deployment](#application-deployment)
+6. [Monitoring Setup](#monitoring-setup)
+7. [Performance Optimization](#performance-optimization)
+8. [Maintenance Procedures](#maintenance-procedures)
+9. [Troubleshooting](#troubleshooting)
 
-## 📋 Table of Contents
+## Prerequisites
 
-1. [Architecture Overview](#architecture-overview)
-2. [Prerequisites](#prerequisites)
-3. [Database Setup](#database-setup)
-4. [Backend Deployment](#backend-deployment)
-5. [Frontend Deployment](#frontend-deployment)
-6. [Environment Configuration](#environment-configuration)
-7. [Security Configuration](#security-configuration)
-8. [Monitoring & Logging](#monitoring--logging)
-9. [Backup Strategy](#backup-strategy)
-10. [Scaling Considerations](#scaling-considerations)
+### System Requirements for 10,000 Users
+- **Application Servers**: 3-5 instances (4 vCPU, 8GB RAM each)
+- **Database**: Primary + Read Replica (8 vCPU, 32GB RAM, 500GB SSD)
+- **Redis Cluster**: 3 nodes (16GB RAM total)
+- **Judge0 Cluster**: 10-20 instances (4 vCPU, 4GB RAM each)
+- **Load Balancer**: Application Load Balancer
+- **CDN**: Global CDN (Cloudflare/AWS CloudFront)
 
-## 🏗️ Architecture Overview
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│                    Production Architecture                   │
-├─────────────────────────────────────────────────────────────┤
-│                                                             │
-│  [Load Balancer] → [Frontend (React/Vite)]                 │
-│         │                     │                             │
-│         ↓                     ↓                             │
-│  [Reverse Proxy] → [Backend API (Express.js)]              │
-│         │                     │                             │
-│         ↓                     ↓                             │
-│  [PostgreSQL] ← → [Redis Cache] ← → [File Storage]         │
-│         │                     │                             │
-│         ↓                     ↓                             │
-│  [Monitoring] → [Logging] → [Backup System]                │
-│                                                             │
-└─────────────────────────────────────────────────────────────┘
-```
-
-## 📝 Prerequisites
-
-### System Requirements
-- **Server**: 4+ CPU cores, 8GB+ RAM, 100GB+ SSD
-- **OS**: Ubuntu 20.04+ LTS or CentOS 8+
-- **Docker**: 20.10+
-- **Docker Compose**: 2.0+
-- **Domain**: SSL certificate (Let's Encrypt recommended)
-
-### Software Dependencies
-- Node.js 18+
-- PostgreSQL 15+
-- Redis 7+
-- Nginx (reverse proxy)
-
-## 🗄️ Database Setup
-
-### 1. PostgreSQL Production Configuration
-
+### Required Tools
 ```bash
-# Install PostgreSQL
+# Install required tools
 sudo apt update
-sudo apt install postgresql postgresql-contrib
-
-# Create database and user
-sudo -u postgres psql
+sudo apt install -y docker docker-compose nginx certbot
+curl -fsSL https://get.docker.com | sh
+sudo usermod -aG docker $USER
 ```
 
-```sql
--- Create database
-CREATE DATABASE techfolks_prod;
-
--- Create user with strong password
-CREATE USER techfolks_user WITH ENCRYPTED PASSWORD 'your_strong_password_here';
-
--- Grant privileges
-GRANT ALL PRIVILEGES ON DATABASE techfolks_prod TO techfolks_user;
-GRANT ALL ON SCHEMA public TO techfolks_user;
-GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO techfolks_user;
-GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO techfolks_user;
-
--- Enable UUID extension
-\c techfolks_prod
-CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
-```
-
-### 2. Run Database Migrations
+### Environment Variables
+Create production environment files:
 
 ```bash
-# Execute schema creation
-psql -U techfolks_user -d techfolks_prod -f src/database/schema.sql
-psql -U techfolks_user -d techfolks_prod -f src/database/migrations/002_create_groups_tables.sql
+# Backend environment
+cp .env.example .env.production
 
-# Create admin user
-psql -U techfolks_user -d techfolks_prod -c "
-INSERT INTO users (id, username, email, password_hash, role, rating, max_rating, full_name) 
-VALUES (
-    gen_random_uuid(), 
-    'admin', 
-    'admin@yourdomain.com', 
-    '\$2b\$12\$LQv3c1yqBwEHxPuNyaGK1.rZXVoJ1ByL1J8J1J8J1J8J1J8J1J8J1J', 
-    'admin', 
-    3000, 
-    3000,
-    'System Administrator'
-) ON CONFLICT (username) DO NOTHING;
-"
-```
-
-### 3. Database Performance Tuning
-
-```sql
--- Add indexes for better performance
-CREATE INDEX CONCURRENTLY idx_users_rating_composite ON users(rating DESC, id) WHERE is_active = true;
-CREATE INDEX CONCURRENTLY idx_submissions_user_created ON submissions(user_id, created_at DESC);
-CREATE INDEX CONCURRENTLY idx_problems_difficulty_public ON problems(difficulty, is_public) WHERE is_public = true;
-
--- Update statistics
-ANALYZE;
-```
-
-## 🖥️ Backend Deployment
-
-### 1. Environment Configuration
-
-Create `.env.production`:
-
-```bash
-# Production Environment
+# Required environment variables
+cat > .env.production << EOF
+# Application
 NODE_ENV=production
+PORT=3000
+APP_VERSION=1.0.0
 
-# Database Configuration
-DB_HOST=localhost
+# Security (GENERATE STRONG SECRETS!)
+JWT_SECRET=$(openssl rand -hex 32)
+JWT_REFRESH_SECRET=$(openssl rand -hex 32)
+SESSION_SECRET=$(openssl rand -hex 32)
+
+# Database
+DB_HOST=postgres-master.internal
 DB_PORT=5432
 DB_NAME=techfolks_prod
 DB_USER=techfolks_user
-DB_PASSWORD=your_strong_database_password
-DB_SSL=true
-DB_POOL_MIN=5
-DB_POOL_MAX=25
+DB_PASSWORD=$(openssl rand -hex 24)
+DB_MAX_CONNECTIONS=100
+DB_MIN_CONNECTIONS=20
 
-# Redis Configuration
-REDIS_HOST=localhost
+# Redis
+REDIS_HOST=redis-cluster.internal
 REDIS_PORT=6379
-REDIS_PASSWORD=your_redis_password
+REDIS_PASSWORD=$(openssl rand -hex 24)
+REDIS_MAX_CONNECTIONS=50
 
-# JWT Configuration (Generate strong secrets!)
-JWT_SECRET=your_super_long_random_jwt_secret_key_here_minimum_64_characters
-JWT_EXPIRE=2h
-JWT_REFRESH_EXPIRE=7d
+# Judge0 Cluster
+JUDGE0_URL=http://judge0-lb:2357
+JUDGE0_AUTH_TOKEN=
 
-# Server Configuration
-PORT=3000
-HOST=0.0.0.0
+# Frontend
+FRONTEND_URL=https://techfolks.com
 
-# Security
-CORS_ORIGIN=https://yourdomain.com
-RATE_LIMIT_WINDOW=15
-RATE_LIMIT_MAX=100
-
-# Features
+# Monitoring
 ENABLE_METRICS=true
-ENABLE_SWAGGER=false
+SENTRY_DSN=your-sentry-dsn
 
-# Logging
-LOG_LEVEL=info
-LOG_DIR=/var/log/techfolks
-
-# File Storage
-UPLOAD_DIR=/var/techfolks/uploads
-MAX_FILE_SIZE=10mb
-
-# Email Configuration
-SMTP_HOST=your-smtp-server.com
+# Email
+SMTP_HOST=smtp.gmail.com
 SMTP_PORT=587
-SMTP_USER=your-email@domain.com
-SMTP_PASS=your-email-password
-FROM_EMAIL=noreply@yourdomain.com
-
-# External APIs
-JUDGE0_API_URL=https://judge0-ce.p.rapidapi.com
-JUDGE0_API_KEY=your_rapidapi_key
-```
-
-### 2. Build and Deploy Backend
-
-```bash
-# Build the application
-npm run build
-
-# Install PM2 for process management
-npm install -g pm2
-
-# Create PM2 ecosystem file
-cat > ecosystem.config.js << EOF
-module.exports = {
-  apps: [{
-    name: 'techfolks-backend',
-    script: 'dist/server.js',
-    instances: 'max',
-    exec_mode: 'cluster',
-    env_production: {
-      NODE_ENV: 'production',
-      PORT: 3000
-    },
-    log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
-    error_file: '/var/log/techfolks/error.log',
-    out_file: '/var/log/techfolks/out.log',
-    log_file: '/var/log/techfolks/combined.log',
-    max_memory_restart: '1G',
-    node_args: '--max_old_space_size=1024'
-  }]
-}
+SMTP_USER=noreply@techfolks.com
+SMTP_PASS=your-app-password
 EOF
 
-# Start with PM2
-pm2 start ecosystem.config.js --env production
-pm2 save
-pm2 startup
-```
-
-## 🌐 Frontend Deployment
-
-### 1. Build Frontend
-
-```bash
-cd techfolks/frontend
-
-# Set production environment variables
-cat > .env.production << EOF
-VITE_API_URL=https://api.yourdomain.com/api
-VITE_WS_URL=wss://api.yourdomain.com
-VITE_APP_NAME=TechFolks
-VITE_APP_URL=https://yourdomain.com
+# Frontend environment
+cat > frontend/.env.production << EOF
+VITE_API_URL=https://api.techfolks.com
+VITE_WS_URL=wss://api.techfolks.com
+VITE_APP_VERSION=1.0.0
+VITE_SENTRY_DSN=your-frontend-sentry-dsn
+VITE_CDN_URL=https://cdn.techfolks.com
 EOF
-
-# Build for production
-npm run build
 ```
 
-### 2. Nginx Configuration
+## Infrastructure Setup
 
-```nginx
-# /etc/nginx/sites-available/techfolks
-server {
-    listen 80;
-    server_name yourdomain.com www.yourdomain.com;
-    return 301 https://$server_name$request_uri;
-}
-
-server {
-    listen 443 ssl http2;
-    server_name yourdomain.com www.yourdomain.com;
-
-    # SSL Configuration
-    ssl_certificate /etc/letsencrypt/live/yourdomain.com/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/yourdomain.com/privkey.pem;
-    ssl_protocols TLSv1.2 TLSv1.3;
-    ssl_ciphers ECDHE-RSA-AES256-GCM-SHA512:DHE-RSA-AES256-GCM-SHA512:ECDHE-RSA-AES256-GCM-SHA384;
-    ssl_prefer_server_ciphers off;
-
-    # Security Headers
-    add_header X-Frame-Options DENY;
-    add_header X-Content-Type-Options nosniff;
-    add_header X-XSS-Protection "1; mode=block";
-    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
-
-    # Frontend
-    location / {
-        root /var/www/techfolks/frontend/dist;
-        try_files $uri $uri/ /index.html;
-        
-        # Cache static assets
-        location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$ {
-            expires 1y;
-            add_header Cache-Control "public, immutable";
-        }
-    }
-
-    # API Proxy
-    location /api/ {
-        proxy_pass http://localhost:3000;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection 'upgrade';
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_cache_bypass $http_upgrade;
-        proxy_redirect off;
-        
-        # Rate limiting
-        limit_req zone=api burst=20 nodelay;
-    }
-
-    # WebSocket for real-time features
-    location /socket.io/ {
-        proxy_pass http://localhost:3000;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection "upgrade";
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-    }
-
-    # Health check
-    location /health {
-        proxy_pass http://localhost:3000/health;
-        access_log off;
-    }
-}
-
-# Rate limiting zones
-http {
-    limit_req_zone $binary_remote_addr zone=api:10m rate=10r/s;
-}
-```
-
-### 3. Deploy Frontend
+### 1. Docker Compose Production Stack
 
 ```bash
-# Create web directory
-sudo mkdir -p /var/www/techfolks/frontend
-sudo chown -R $USER:www-data /var/www/techfolks
+# Create production docker-compose
+cat > docker-compose.prod.yml << 'EOF'
+version: '3.8'
 
-# Copy built files
-cp -r dist/* /var/www/techfolks/frontend/
+services:
+  # Application instances (3 replicas for high availability)
+  app:
+    build: 
+      context: .
+      dockerfile: Dockerfile.prod
+    deploy:
+      replicas: 3
+      resources:
+        limits:
+          cpus: '2'
+          memory: 4G
+        reservations:
+          cpus: '1'
+          memory: 2G
+      restart_policy:
+        condition: on-failure
+        delay: 10s
+        max_attempts: 3
+    env_file:
+      - .env.production
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
-# Enable Nginx site
-sudo ln -s /etc/nginx/sites-available/techfolks /etc/nginx/sites-enabled/
-sudo nginx -t
-sudo systemctl reload nginx
+  # PostgreSQL Primary
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_INITDB_ARGS: "--auth-host=scram-sha-256"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./postgres/postgresql.conf:/etc/postgresql/postgresql.conf
+      - ./postgres/pg_hba.conf:/etc/postgresql/pg_hba.conf
+    command: postgres -c config_file=/etc/postgresql/postgresql.conf
+    networks:
+      - app-network
+    deploy:
+      resources:
+        limits:
+          cpus: '4'
+          memory: 16G
+        reservations:
+          cpus: '2'
+          memory: 8G
+
+  # Redis Cluster
+  redis:
+    image: redis:7-alpine
+    command: >
+      redis-server
+      --requirepass ${REDIS_PASSWORD}
+      --maxmemory 8gb
+      --maxmemory-policy allkeys-lru
+      --save 900 1
+      --save 300 10
+      --save 60 10000
+    volumes:
+      - redis-data:/data
+    networks:
+      - app-network
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 8G
+        reservations:
+          cpus: '1'
+          memory: 4G
+
+  # Nginx Load Balancer
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.prod.conf:/etc/nginx/nginx.conf
+      - ./ssl:/etc/ssl/certs
+      - frontend-build:/usr/share/nginx/html
+    depends_on:
+      - app
+    networks:
+      - app-network
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1G
+
+volumes:
+  postgres-data:
+  redis-data:
+  frontend-build:
+
+networks:
+  app-network:
+    driver: bridge
+EOF
 ```
 
-## 🔐 Security Configuration
+### 2. Production Dockerfile
 
-### 1. SSL Certificate (Let's Encrypt)
+```dockerfile
+# Create optimized production Dockerfile
+cat > Dockerfile.prod << 'EOF'
+# Multi-stage build for production
+FROM node:18-alpine AS builder
+
+# Set working directory
+WORKDIR /app
+
+# Copy package files
+COPY package*.json ./
+COPY frontend/package*.json ./frontend/
+
+# Install dependencies
+RUN npm ci --only=production && npm cache clean --force
+RUN cd frontend && npm ci --only=production && npm cache clean --force
+
+# Copy source code
+COPY . .
+
+# Build frontend
+RUN cd frontend && npm run build
+
+# Build backend
+RUN npm run build
+
+# Production stage
+FROM node:18-alpine AS production
+
+# Create non-root user
+RUN addgroup -g 1001 -S nodejs
+RUN adduser -S techfolks -u 1001
+
+# Set working directory
+WORKDIR /app
+
+# Copy built application
+COPY --from=builder --chown=techfolks:nodejs /app/dist ./dist
+COPY --from=builder --chown=techfolks:nodejs /app/node_modules ./node_modules
+COPY --from=builder --chown=techfolks:nodejs /app/package*.json ./
+
+# Copy frontend build
+COPY --from=builder --chown=techfolks:nodejs /app/frontend/dist ./public
+
+# Install production dependencies only
+RUN npm ci --only=production && npm cache clean --force
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+  CMD curl -f http://localhost:3000/health || exit 1
+
+# Switch to non-root user
+USER techfolks
+
+# Expose port
+EXPOSE 3000
+
+# Start application
+CMD ["node", "dist/app.js"]
+EOF
+```
+
+## Security Configuration
+
+### 1. SSL/TLS Setup with Let's Encrypt
 
 ```bash
 # Install Certbot
 sudo apt install certbot python3-certbot-nginx
 
-# Obtain certificate
-sudo certbot --nginx -d yourdomain.com -d www.yourdomain.com
+# Obtain SSL certificates
+sudo certbot --nginx -d techfolks.com -d www.techfolks.com -d api.techfolks.com
 
-# Auto-renewal
+# Setup auto-renewal
 sudo crontab -e
 # Add: 0 12 * * * /usr/bin/certbot renew --quiet
 ```
@@ -352,243 +295,538 @@ sudo crontab -e
 ### 2. Firewall Configuration
 
 ```bash
-# Configure UFW
+# Configure UFW firewall
+sudo ufw enable
 sudo ufw default deny incoming
 sudo ufw default allow outgoing
-sudo ufw allow ssh
-sudo ufw allow 80/tcp
-sudo ufw allow 443/tcp
-sudo ufw enable
+
+# Allow necessary ports
+sudo ufw allow 22/tcp    # SSH
+sudo ufw allow 80/tcp    # HTTP
+sudo ufw allow 443/tcp   # HTTPS
+sudo ufw allow from 10.0.0.0/8 to any port 3000  # Internal app access
+sudo ufw allow from 10.0.0.0/8 to any port 5432  # Internal DB access
+sudo ufw allow from 10.0.0.0/8 to any port 6379  # Internal Redis access
+
+# Enable logging
+sudo ufw logging on
 ```
 
-### 3. Database Security
+### 3. Security Headers
 
-```sql
--- Remove default postgres user if not needed
--- Create read-only user for monitoring
-CREATE USER techfolks_readonly WITH ENCRYPTED PASSWORD 'readonly_password';
-GRANT CONNECT ON DATABASE techfolks_prod TO techfolks_readonly;
-GRANT USAGE ON SCHEMA public TO techfolks_readonly;
-GRANT SELECT ON ALL TABLES IN SCHEMA public TO techfolks_readonly;
+```nginx
+# Add to nginx configuration
+add_header Strict-Transport-Security "max-age=31536000; includeSubDomains; preload" always;
+add_header X-Content-Type-Options "nosniff" always;
+add_header X-Frame-Options "DENY" always;
+add_header X-XSS-Protection "1; mode=block" always;
+add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' wss: https:;" always;
 ```
 
-## 📊 Monitoring & Logging
+## Database Setup
 
-### 1. Application Monitoring
+### 1. PostgreSQL Optimization
 
 ```bash
-# Install Node Exporter
-wget https://github.com/prometheus/node_exporter/releases/download/v1.6.1/node_exporter-1.6.1.linux-amd64.tar.gz
-tar xzf node_exporter-1.6.1.linux-amd64.tar.gz
-sudo mv node_exporter-1.6.1.linux-amd64/node_exporter /usr/local/bin/
-```
+# Create optimized PostgreSQL configuration
+cat > postgres/postgresql.conf << 'EOF'
+# Connection settings
+max_connections = 200
+shared_buffers = 8GB
+effective_cache_size = 24GB
+work_mem = 64MB
+maintenance_work_mem = 2GB
 
-### 2. Log Management
+# WAL settings
+wal_buffers = 16MB
+checkpoint_completion_target = 0.9
+max_wal_size = 4GB
+min_wal_size = 1GB
 
-```bash
-# Configure log rotation
-sudo cat > /etc/logrotate.d/techfolks << EOF
-/var/log/techfolks/*.log {
-    daily
-    missingok
-    rotate 52
-    compress
-    delaycompress
-    notifempty
-    create 0644 techfolks techfolks
-    postrotate
-        pm2 reload techfolks-backend
-    endscript
-}
+# Query planner
+random_page_cost = 1.1
+effective_io_concurrency = 200
+
+# Logging
+log_statement = 'ddl'
+log_min_duration_statement = 1000
+log_checkpoints = on
+log_connections = on
+log_disconnections = on
+log_lock_waits = on
+
+# Performance
+shared_preload_libraries = 'pg_stat_statements'
+track_activity_query_size = 2048
+pg_stat_statements.track = all
 EOF
+
+# Apply database indexes
+psql -U techfolks_user -d techfolks_prod -f migrations/add_performance_indexes.sql
 ```
 
-### 3. Health Checks
-
-```bash
-# Create health check script
-cat > /opt/techfolks/health-check.sh << EOF
-#!/bin/bash
-if curl -f -s http://localhost:3000/health > /dev/null; then
-    echo "Backend: OK"
-else
-    echo "Backend: FAILED"
-    pm2 restart techfolks-backend
-fi
-EOF
-
-chmod +x /opt/techfolks/health-check.sh
-
-# Add to crontab
-echo "*/5 * * * * /opt/techfolks/health-check.sh" | crontab -
-```
-
-## 💾 Backup Strategy
-
-### 1. Database Backup
+### 2. Database Backup Strategy
 
 ```bash
 # Create backup script
-cat > /opt/techfolks/backup-db.sh << EOF
+cat > scripts/backup_database.sh << 'EOF'
 #!/bin/bash
-BACKUP_DIR="/var/backups/techfolks"
-DATE=\$(date +%Y%m%d_%H%M%S)
-mkdir -p \$BACKUP_DIR
+DATE=$(date +%Y%m%d_%H%M%S)
+BACKUP_DIR="/backups/postgres"
+RETENTION_DAYS=30
 
-# Database backup
-pg_dump -U techfolks_user -h localhost techfolks_prod | gzip > \$BACKUP_DIR/db_\$DATE.sql.gz
+# Create backup directory
+mkdir -p $BACKUP_DIR
 
-# Cleanup old backups (keep 30 days)
-find \$BACKUP_DIR -name "*.sql.gz" -mtime +30 -delete
+# Create backup
+pg_dump -h postgres -U techfolks_user -d techfolks_prod | gzip > $BACKUP_DIR/backup_$DATE.sql.gz
+
+# Upload to S3 (optional)
+# aws s3 cp $BACKUP_DIR/backup_$DATE.sql.gz s3://techfolks-backups/postgres/
+
+# Clean old backups
+find $BACKUP_DIR -name "backup_*.sql.gz" -mtime +$RETENTION_DAYS -delete
+
+echo "Backup completed: backup_$DATE.sql.gz"
 EOF
 
-chmod +x /opt/techfolks/backup-db.sh
+chmod +x scripts/backup_database.sh
 
-# Schedule daily backups
-echo "0 2 * * * /opt/techfolks/backup-db.sh" | crontab -
+# Setup daily backup cron
+echo "0 2 * * * /app/scripts/backup_database.sh" | crontab -
 ```
 
-### 2. File Backup
+## Application Deployment
+
+### 1. Build and Deploy Script
 
 ```bash
-# Backup uploads and logs
-tar -czf /var/backups/techfolks/files_$(date +%Y%m%d).tar.gz \
-    /var/techfolks/uploads \
-    /var/log/techfolks
+# Create deployment script
+cat > scripts/deploy.sh << 'EOF'
+#!/bin/bash
+set -e
+
+echo "🚀 Starting TechFolks Production Deployment"
+
+# Variables
+REPO_URL="https://github.com/yourusername/techfolks.git"
+DEPLOY_DIR="/opt/techfolks"
+BACKUP_DIR="/opt/backups"
+DATE=$(date +%Y%m%d_%H%M%S)
+
+# Create backup of current deployment
+if [ -d "$DEPLOY_DIR" ]; then
+    echo "📦 Creating backup of current deployment"
+    sudo cp -r $DEPLOY_DIR $BACKUP_DIR/techfolks_$DATE
+fi
+
+# Clone or update repository
+if [ ! -d "$DEPLOY_DIR" ]; then
+    echo "📥 Cloning repository"
+    sudo git clone $REPO_URL $DEPLOY_DIR
+else
+    echo "🔄 Updating repository"
+    cd $DEPLOY_DIR
+    sudo git fetch origin
+    sudo git reset --hard origin/main
+fi
+
+cd $DEPLOY_DIR
+
+# Copy environment files
+echo "⚙️ Setting up environment"
+sudo cp .env.production .env
+
+# Build and start services
+echo "🏗️ Building application"
+sudo docker-compose -f docker-compose.prod.yml build --no-cache
+
+echo "🧪 Running database migrations"
+sudo docker-compose -f docker-compose.prod.yml run --rm app npm run migrate:prod
+
+echo "🌱 Starting services"
+sudo docker-compose -f docker-compose.prod.yml up -d
+
+# Health check
+echo "🔍 Performing health check"
+sleep 30
+if curl -f http://localhost/health; then
+    echo "✅ Deployment successful!"
+    
+    # Clean up old Docker images
+    sudo docker image prune -f
+    
+    echo "🧹 Cleanup completed"
+else
+    echo "❌ Health check failed - rolling back"
+    sudo docker-compose -f docker-compose.prod.yml down
+    
+    # Restore backup if available
+    if [ -d "$BACKUP_DIR/techfolks_$DATE" ]; then
+        sudo rm -rf $DEPLOY_DIR
+        sudo mv $BACKUP_DIR/techfolks_$DATE $DEPLOY_DIR
+        cd $DEPLOY_DIR
+        sudo docker-compose -f docker-compose.prod.yml up -d
+        echo "🔄 Rollback completed"
+    fi
+    exit 1
+fi
+
+echo "🎉 Deployment completed successfully!"
+EOF
+
+chmod +x scripts/deploy.sh
 ```
 
-## 📈 Scaling Considerations
-
-### 1. Horizontal Scaling
-
-```yaml
-# docker-compose.prod.yml for multiple instances
-version: '3.8'
-services:
-  app:
-    image: techfolks/backend:latest
-    deploy:
-      replicas: 3
-      resources:
-        limits:
-          memory: 1G
-        reservations:
-          memory: 512M
-```
-
-### 2. Database Optimization
-
-```sql
--- Connection pooling settings in postgresql.conf
-max_connections = 200
-shared_buffers = 2GB
-effective_cache_size = 6GB
-work_mem = 64MB
-maintenance_work_mem = 512MB
-
--- Enable query optimization
-log_min_duration_statement = 1000
-log_statement = 'mod'
-```
-
-### 3. Redis Clustering
+### 2. Zero-Downtime Deployment
 
 ```bash
-# Redis cluster configuration
-redis-cli --cluster create \
-  127.0.0.1:7001 127.0.0.1:7002 127.0.0.1:7003 \
-  --cluster-replicas 0
+# Blue-Green deployment script
+cat > scripts/blue_green_deploy.sh << 'EOF'
+#!/bin/bash
+set -e
+
+# Determine current and target environments
+CURRENT=$(docker-compose -f docker-compose.prod.yml ps --services --filter "status=running" | head -1)
+if [[ $CURRENT == *"blue"* ]]; then
+    TARGET="green"
+    OLD="blue"
+else
+    TARGET="blue"
+    OLD="green"
+fi
+
+echo "🔄 Deploying to $TARGET environment"
+
+# Build and start new environment
+docker-compose -f docker-compose.$TARGET.yml build
+docker-compose -f docker-compose.$TARGET.yml up -d
+
+# Wait for health check
+echo "⏳ Waiting for $TARGET environment to be healthy"
+for i in {1..30}; do
+    if curl -f http://localhost:800$TARGET/health; then
+        echo "✅ $TARGET environment is healthy"
+        break
+    fi
+    if [ $i -eq 30 ]; then
+        echo "❌ $TARGET environment failed health check"
+        docker-compose -f docker-compose.$TARGET.yml down
+        exit 1
+    fi
+    sleep 10
+done
+
+# Switch traffic (update load balancer)
+echo "🔀 Switching traffic to $TARGET"
+# Update nginx upstream or load balancer configuration here
+
+# Verify traffic switch
+sleep 10
+if curl -f http://localhost/health; then
+    echo "✅ Traffic switch successful"
+    
+    # Stop old environment
+    echo "🛑 Stopping $OLD environment"
+    docker-compose -f docker-compose.$OLD.yml down
+    
+    echo "🎉 Blue-Green deployment completed!"
+else
+    echo "❌ Traffic switch failed - rolling back"
+    # Rollback logic here
+    exit 1
+fi
+EOF
+
+chmod +x scripts/blue_green_deploy.sh
 ```
 
-## 🚀 Deployment Checklist
+## Monitoring Setup
 
-- [ ] Database schema created and migrated
-- [ ] Environment variables configured
-- [ ] SSL certificates installed
-- [ ] Backend application deployed with PM2
-- [ ] Frontend built and served by Nginx
-- [ ] Firewall configured
-- [ ] Monitoring setup
-- [ ] Backup strategy implemented
-- [ ] Health checks configured
-- [ ] Domain DNS configured
-- [ ] Admin user created
-- [ ] Performance testing completed
-
-## 📞 Troubleshooting
-
-### Common Issues
-
-1. **Database Connection Failed**
-   ```bash
-   # Check PostgreSQL status
-   sudo systemctl status postgresql
-   
-   # Check connection
-   psql -U techfolks_user -d techfolks_prod -h localhost
-   ```
-
-2. **Backend Not Starting**
-   ```bash
-   # Check PM2 logs
-   pm2 logs techfolks-backend
-   
-   # Check environment variables
-   pm2 env 0
-   ```
-
-3. **Frontend Not Loading**
-   ```bash
-   # Check Nginx configuration
-   sudo nginx -t
-   
-   # Check Nginx logs
-   sudo tail -f /var/log/nginx/error.log
-   ```
-
-## 🔄 Updates and Maintenance
-
-### Application Updates
+### 1. Start Monitoring Stack
 
 ```bash
-# Backend update
-git pull origin main
-npm run build
-pm2 reload techfolks-backend
+# Deploy monitoring stack
+cd monitoring
+docker-compose -f docker-compose.monitoring.yml up -d
 
-# Frontend update
-cd techfolks/frontend
-npm run build
-cp -r dist/* /var/www/techfolks/frontend/
+# Verify services
+docker-compose -f docker-compose.monitoring.yml ps
+
+# Access monitoring interfaces
+echo "Grafana: http://localhost:3001 (admin/admin123)"
+echo "Prometheus: http://localhost:9090"
+echo "AlertManager: http://localhost:9093"
 ```
 
-### Database Migrations
+### 2. Configure Alerts
 
 ```bash
-# Run new migrations
-psql -U techfolks_user -d techfolks_prod -f new_migration.sql
+# Test alert configuration
+curl -X POST http://localhost:9093/api/v1/alerts
+
+# Test Slack notifications
+curl -X POST http://localhost:9093/api/v1/receivers/test
+
+# Verify alert rules
+curl http://localhost:9090/api/v1/rules
 ```
+
+## Performance Optimization
+
+### 1. Judge0 Cluster Setup
+
+```bash
+# Deploy Judge0 cluster
+docker-compose -f docker-compose.judge0-cluster.yml up -d
+
+# Verify cluster health
+curl http://localhost:2357/health
+
+# Test load balancing
+for i in {1..10}; do
+    curl -s http://localhost:2357/system_info | jq '.hostname'
+done
+```
+
+### 2. Cache Warming
+
+```bash
+# Warm up application caches
+cat > scripts/warm_cache.sh << 'EOF'
+#!/bin/bash
+
+echo "🔥 Warming up caches"
+
+# Warm up problem cache
+curl -s http://localhost/api/problems > /dev/null
+
+# Warm up contest cache  
+curl -s http://localhost/api/contests > /dev/null
+
+# Warm up leaderboard cache
+curl -s http://localhost/api/leaderboard > /dev/null
+
+echo "✅ Cache warming completed"
+EOF
+
+chmod +x scripts/warm_cache.sh
+./scripts/warm_cache.sh
+```
+
+## Maintenance Procedures
+
+### 1. Regular Maintenance Tasks
+
+```bash
+# Create maintenance script
+cat > scripts/maintenance.sh << 'EOF'
+#!/bin/bash
+
+echo "🔧 Starting maintenance tasks"
+
+# 1. Database maintenance
+echo "📊 Database maintenance"
+docker-compose -f docker-compose.prod.yml exec postgres psql -U techfolks_user -d techfolks_prod -c "VACUUM ANALYZE;"
+docker-compose -f docker-compose.prod.yml exec postgres psql -U techfolks_user -d techfolks_prod -c "REINDEX DATABASE techfolks_prod;"
+
+# 2. Clear old logs
+echo "🗑️ Cleaning old logs"
+find /var/log -name "*.log" -mtime +30 -delete
+docker system prune -f
+
+# 3. Update SSL certificates
+echo "🔒 Checking SSL certificates"
+certbot renew --quiet
+
+# 4. Security updates
+echo "🛡️ Applying security updates"
+apt update && apt upgrade -y
+
+# 5. Backup verification
+echo "💾 Verifying backups"
+./scripts/backup_database.sh
+
+echo "✅ Maintenance completed"
+EOF
+
+chmod +x scripts/maintenance.sh
+
+# Schedule weekly maintenance
+echo "0 3 * * 0 /opt/techfolks/scripts/maintenance.sh" | crontab -
+```
+
+### 2. Health Check Monitoring
+
+```bash
+# Create health monitoring script
+cat > scripts/health_monitor.sh << 'EOF'
+#!/bin/bash
+
+# Check application health
+APP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost/health)
+if [ $APP_STATUS -ne 200 ]; then
+    echo "❌ Application health check failed: $APP_STATUS"
+    # Send alert
+    curl -X POST -H 'Content-type: application/json' \
+        --data '{"text":"🚨 TechFolks application health check failed"}' \
+        $SLACK_WEBHOOK_URL
+fi
+
+# Check database connectivity
+DB_STATUS=$(docker-compose -f docker-compose.prod.yml exec -T postgres pg_isready -U techfolks_user)
+if [[ $DB_STATUS != *"accepting connections"* ]]; then
+    echo "❌ Database health check failed"
+    # Send alert
+fi
+
+# Check Redis connectivity
+REDIS_STATUS=$(docker-compose -f docker-compose.prod.yml exec -T redis redis-cli -a $REDIS_PASSWORD ping)
+if [ "$REDIS_STATUS" != "PONG" ]; then
+    echo "❌ Redis health check failed"
+    # Send alert
+fi
+
+# Check disk space
+DISK_USAGE=$(df / | awk 'NR==2{print $5}' | sed 's/%//')
+if [ $DISK_USAGE -gt 80 ]; then
+    echo "⚠️ High disk usage: ${DISK_USAGE}%"
+    # Send alert
+fi
+
+echo "✅ Health checks completed"
+EOF
+
+chmod +x scripts/health_monitor.sh
+
+# Schedule every 5 minutes
+echo "*/5 * * * * /opt/techfolks/scripts/health_monitor.sh" | crontab -
+```
+
+## Troubleshooting
+
+### Common Issues and Solutions
+
+#### 1. High Memory Usage
+```bash
+# Check memory usage
+docker stats
+
+# Restart high memory containers
+docker-compose -f docker-compose.prod.yml restart app
+
+# Optimize queries causing memory issues
+docker-compose -f docker-compose.prod.yml logs app | grep "slow query"
+```
+
+#### 2. Database Connection Issues
+```bash
+# Check connection pool status
+curl http://localhost/api/health/database
+
+# Reset connection pool
+docker-compose -f docker-compose.prod.yml restart postgres
+
+# Check database logs
+docker-compose -f docker-compose.prod.yml logs postgres
+```
+
+#### 3. Queue Backlog
+```bash
+# Check queue status
+curl http://localhost/api/health/queue
+
+# Clear stuck jobs
+docker-compose -f docker-compose.prod.yml exec redis redis-cli -a $REDIS_PASSWORD FLUSHDB
+
+# Restart queue workers
+docker-compose -f docker-compose.prod.yml restart app
+```
+
+#### 4. SSL Certificate Issues
+```bash
+# Check certificate status
+sudo certbot certificates
+
+# Renew certificates
+sudo certbot renew --force-renewal
+
+# Restart nginx
+docker-compose -f docker-compose.prod.yml restart nginx
+```
+
+### Log Analysis
+
+```bash
+# Application logs
+docker-compose -f docker-compose.prod.yml logs -f app
+
+# Error logs only
+docker-compose -f docker-compose.prod.yml logs app | grep ERROR
+
+# Performance logs
+docker-compose -f docker-compose.prod.yml logs app | grep "slow"
+
+# Access nginx logs
+tail -f /var/log/nginx/access.log
+tail -f /var/log/nginx/error.log
+```
+
+### Emergency Procedures
+
+#### 1. Complete System Restart
+```bash
+# Stop all services
+docker-compose -f docker-compose.prod.yml down
+docker-compose -f docker-compose.judge0-cluster.yml down
+docker-compose -f monitoring/docker-compose.monitoring.yml down
+
+# Clear caches
+docker system prune -a -f
+
+# Start services in order
+docker-compose -f docker-compose.prod.yml up -d postgres redis
+sleep 30
+docker-compose -f docker-compose.prod.yml up -d app nginx
+docker-compose -f docker-compose.judge0-cluster.yml up -d
+docker-compose -f monitoring/docker-compose.monitoring.yml up -d
+```
+
+#### 2. Database Recovery
+```bash
+# Stop application
+docker-compose -f docker-compose.prod.yml stop app
+
+# Restore from backup
+gunzip -c /backups/postgres/backup_YYYYMMDD_HHMMSS.sql.gz | \
+    docker-compose -f docker-compose.prod.yml exec -T postgres psql -U techfolks_user -d techfolks_prod
+
+# Start application
+docker-compose -f docker-compose.prod.yml start app
+```
+
+## Performance Targets
+
+With this production setup, you should achieve:
+
+- **Response Time**: < 200ms (95th percentile)
+- **Throughput**: 2,000+ requests/second
+- **Availability**: 99.9% uptime
+- **Concurrent Users**: 10,000+ supported
+- **Submission Processing**: 500+ submissions/minute
+- **Database Performance**: < 50ms average query time
+- **Cache Hit Rate**: > 90%
+
+## Support Contacts
+
+- **DevOps Team**: devops@techfolks.com
+- **Security Team**: security@techfolks.com
+- **Database Team**: dba@techfolks.com
+- **On-call**: +1-XXX-XXX-XXXX
 
 ---
 
-## 📈 Performance Benchmarks
-
-**Expected Performance:**
-- **API Response Time**: < 100ms (95th percentile)
-- **Database Queries**: < 50ms average
-- **Concurrent Users**: 1000+ 
-- **Throughput**: 1000+ requests/second
-
-**Production Ready Features:**
-- ✅ Real database with proper schema
-- ✅ JWT authentication
-- ✅ API rate limiting
-- ✅ Input validation
-- ✅ Error handling
-- ✅ Logging and monitoring
-- ✅ Security headers
-- ✅ SSL/TLS encryption
-- ✅ Backup strategy
-- ✅ Health checks
-
-This production setup replaces all localStorage usage with proper API calls to a PostgreSQL database, ensuring data persistence, scalability, and multi-user support.
+**Last Updated**: $(date)
+**Version**: 1.0.0
+**Environment**: Production

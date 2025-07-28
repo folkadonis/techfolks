@@ -1,0 +1,141 @@
+# Prometheus Configuration for TechFolks Production
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    cluster: 'techfolks-production'
+    environment: 'production'
+
+# Alerting configuration
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+          - alertmanager:9093
+
+# Load alerting rules
+rule_files:
+  - "alerts.yml"
+
+# Scrape configurations
+scrape_configs:
+  # Prometheus itself
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+    scrape_interval: 30s
+
+  # TechFolks Backend Application
+  - job_name: 'techfolks-backend'
+    static_configs:
+      - targets: ['app:3000']
+    metrics_path: '/metrics'
+    scrape_interval: 15s
+    scrape_timeout: 10s
+
+  # System metrics
+  - job_name: 'node-exporter'
+    static_configs:
+      - targets: ['node-exporter:9100']
+    scrape_interval: 30s
+
+  # Container metrics
+  - job_name: 'cadvisor'
+    static_configs:
+      - targets: ['cadvisor:8080']
+    scrape_interval: 30s
+
+  # Database metrics
+  - job_name: 'postgres-exporter'
+    static_configs:
+      - targets: ['postgres-exporter:9187']
+    scrape_interval: 30s
+
+  # Redis metrics
+  - job_name: 'redis-exporter'
+    static_configs:
+      - targets: ['redis-exporter:9121']
+    scrape_interval: 30s
+
+  # Nginx metrics
+  - job_name: 'nginx-exporter'
+    static_configs:
+      - targets: ['nginx-exporter:9113']
+    scrape_interval: 30s
+
+  # Judge0 cluster monitoring
+  - job_name: 'judge0-cluster'
+    static_configs:
+      - targets: 
+          - 'judge0-server-1:2358'
+          - 'judge0-server-2:2358'
+          - 'judge0-server-3:2358'
+          - 'judge0-server-4:2358'
+          - 'judge0-server-5:2358'
+    metrics_path: '/system_info'
+    scrape_interval: 30s
+    scrape_timeout: 10s
+
+  # HAProxy metrics (if available)
+  - job_name: 'haproxy'
+    static_configs:
+      - targets: ['judge0-lb:8404']
+    metrics_path: '/stats'
+    scrape_interval: 30s
+
+  # Blackbox exporter for endpoint monitoring
+  - job_name: 'blackbox-http'
+    metrics_path: /probe
+    params:
+      module: [http_2xx]
+    static_configs:
+      - targets:
+          - https://techfolks.com
+          - https://api.techfolks.com/health
+          - https://api.techfolks.com/api/problems
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: blackbox-exporter:9115
+
+  # Custom application health checks
+  - job_name: 'techfolks-health'
+    metrics_path: /probe
+    params:
+      module: [http_2xx]
+    static_configs:
+      - targets:
+          - http://app:3000/health
+          - http://app:3000/api/health/database
+          - http://app:3000/api/health/redis
+          - http://app:3000/api/health/judge0
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: blackbox-exporter:9115
+
+  # Federation from other Prometheus instances (if any)
+  - job_name: 'federate'
+    scrape_interval: 15s
+    honor_labels: true
+    metrics_path: '/federate'
+    params:
+      'match[]':
+        - '{job=~"techfolks.*"}'
+        - '{__name__=~"job:.*"}'
+    static_configs:
+      - targets:
+          # Add other Prometheus instances here
+          # - 'prometheus-regional:9090'
+
+# Storage configuration
+storage:
+  tsdb:
+    retention.time: 30d
+    retention.size: 10GB

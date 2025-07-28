@@ -1,0 +1,276 @@
+# Judge0 Cluster Configuration for High Availability
+# This setup provides multiple Judge0 instances with load balancing
+
+version: '3.8'
+
+services:
+  # Judge0 Instance 1
+  judge0-server-1:
+    image: judge0/judge0:1.13.0
+    container_name: judge0-server-1
+    restart: unless-stopped
+    ports:
+      - "2358:2358"
+    privileged: true
+    environment:
+      - RAILS_ENV=production
+      - REDIS_URL=redis://redis-judge0:6379
+      - DATABASE_URL=postgresql://judge0:password@postgres-judge0:5432/judge0
+      - REDIS_PASSWORD=
+      - POSTGRES_PASSWORD=password
+      - JUDGE0_VERSION=1.13.0
+      - JUDGE0_HOMEPAGE=https://judge0.com
+      - ENABLE_WAIT_RESULT=true
+      - ENABLE_COMPILER_OPTIONS=true
+      - ALLOWED_LANGUAGES_FILE=/judge0/app/controllers/languages.rb
+      - MAX_QUEUE_SIZE=1000
+      - MAX_PROCESSES_PER_WORKER=32
+      - MAX_WORKERS=8
+    volumes:
+      - ./judge0.conf:/judge0.conf:ro
+    depends_on:
+      - postgres-judge0
+      - redis-judge0
+    networks:
+      - judge0-network
+    deploy:
+      resources:
+        limits:
+          cpus: '4'
+          memory: 4G
+        reservations:
+          cpus: '2'
+          memory: 2G
+
+  # Judge0 Instance 2
+  judge0-server-2:
+    image: judge0/judge0:1.13.0
+    container_name: judge0-server-2
+    restart: unless-stopped
+    ports:
+      - "2359:2358"
+    privileged: true
+    environment:
+      - RAILS_ENV=production
+      - REDIS_URL=redis://redis-judge0:6379
+      - DATABASE_URL=postgresql://judge0:password@postgres-judge0:5432/judge0
+      - REDIS_PASSWORD=
+      - POSTGRES_PASSWORD=password
+      - JUDGE0_VERSION=1.13.0
+      - JUDGE0_HOMEPAGE=https://judge0.com
+      - ENABLE_WAIT_RESULT=true
+      - ENABLE_COMPILER_OPTIONS=true
+      - ALLOWED_LANGUAGES_FILE=/judge0/app/controllers/languages.rb
+      - MAX_QUEUE_SIZE=1000
+      - MAX_PROCESSES_PER_WORKER=32
+      - MAX_WORKERS=8
+    volumes:
+      - ./judge0.conf:/judge0.conf:ro
+    depends_on:
+      - postgres-judge0
+      - redis-judge0
+    networks:
+      - judge0-network
+    deploy:
+      resources:
+        limits:
+          cpus: '4'
+          memory: 4G
+        reservations:
+          cpus: '2'
+          memory: 2G
+
+  # Judge0 Instance 3
+  judge0-server-3:
+    image: judge0/judge0:1.13.0
+    container_name: judge0-server-3
+    restart: unless-stopped
+    ports:
+      - "2360:2358"
+    privileged: true
+    environment:
+      - RAILS_ENV=production
+      - REDIS_URL=redis://redis-judge0:6379
+      - DATABASE_URL=postgresql://judge0:password@postgres-judge0:5432/judge0
+      - REDIS_PASSWORD=
+      - POSTGRES_PASSWORD=password
+      - JUDGE0_VERSION=1.13.0
+      - JUDGE0_HOMEPAGE=https://judge0.com
+      - ENABLE_WAIT_RESULT=true
+      - ENABLE_COMPILER_OPTIONS=true
+      - ALLOWED_LANGUAGES_FILE=/judge0/app/controllers/languages.rb
+      - MAX_QUEUE_SIZE=1000
+      - MAX_PROCESSES_PER_WORKER=32
+      - MAX_WORKERS=8
+    volumes:
+      - ./judge0.conf:/judge0.conf:ro
+    depends_on:
+      - postgres-judge0
+      - redis-judge0
+    networks:
+      - judge0-network
+    deploy:
+      resources:
+        limits:
+          cpus: '4'
+          memory: 4G
+        reservations:
+          cpus: '2'
+          memory: 2G
+
+  # Judge0 Instance 4
+  judge0-server-4:
+    image: judge0/judge0:1.13.0
+    container_name: judge0-server-4
+    restart: unless-stopped
+    ports:
+      - "2361:2358"
+    privileged: true
+    environment:
+      - RAILS_ENV=production
+      - REDIS_URL=redis://redis-judge0:6379
+      - DATABASE_URL=postgresql://judge0:password@postgres-judge0:5432/judge0
+      - REDIS_PASSWORD=
+      - POSTGRES_PASSWORD=password
+      - JUDGE0_VERSION=1.13.0
+      - JUDGE0_HOMEPAGE=https://judge0.com
+      - ENABLE_WAIT_RESULT=true
+      - ENABLE_COMPILER_OPTIONS=true
+      - ALLOWED_LANGUAGES_FILE=/judge0/app/controllers/languages.rb
+      - MAX_QUEUE_SIZE=1000
+      - MAX_PROCESSES_PER_WORKER=32
+      - MAX_WORKERS=8
+    volumes:
+      - ./judge0.conf:/judge0.conf:ro
+    depends_on:
+      - postgres-judge0
+      - redis-judge0
+    networks:
+      - judge0-network
+    deploy:
+      resources:
+        limits:
+          cpus: '4'
+          memory: 4G
+        reservations:
+          cpus: '2'
+          memory: 2G
+
+  # Judge0 Instance 5
+  judge0-server-5:
+    image: judge0/judge0:1.13.0
+    container_name: judge0-server-5
+    restart: unless-stopped
+    ports:
+      - "2362:2358"
+    privileged: true
+    environment:
+      - RAILS_ENV=production
+      - REDIS_URL=redis://redis-judge0:6379
+      - DATABASE_URL=postgresql://judge0:password@postgres-judge0:5432/judge0
+      - REDIS_PASSWORD=
+      - POSTGRES_PASSWORD=password
+      - JUDGE0_VERSION=1.13.0
+      - JUDGE0_HOMEPAGE=https://judge0.com
+      - ENABLE_WAIT_RESULT=true
+      - ENABLE_COMPILER_OPTIONS=true
+      - ALLOWED_LANGUAGES_FILE=/judge0/app/controllers/languages.rb
+      - MAX_QUEUE_SIZE=1000
+      - MAX_PROCESSES_PER_WORKER=32
+      - MAX_WORKERS=8
+    volumes:
+      - ./judge0.conf:/judge0.conf:ro
+    depends_on:
+      - postgres-judge0
+      - redis-judge0
+    networks:
+      - judge0-network
+    deploy:
+      resources:
+        limits:
+          cpus: '4'
+          memory: 4G
+        reservations:
+          cpus: '2'
+          memory: 2G
+
+  # PostgreSQL for Judge0
+  postgres-judge0:
+    image: postgres:13
+    container_name: postgres-judge0
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: judge0
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: judge0
+      POSTGRES_INITDB_ARGS: "--encoding=UTF-8 --lc-collate=en_US.UTF-8 --lc-ctype=en_US.UTF-8"
+    volumes:
+      - judge0-postgres-data:/var/lib/postgresql/data
+    networks:
+      - judge0-network
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+        reservations:
+          cpus: '1'
+          memory: 1G
+
+  # Redis for Judge0
+  redis-judge0:
+    image: redis:6-alpine
+    container_name: redis-judge0
+    restart: unless-stopped
+    command: redis-server --appendonly yes --maxmemory 1gb --maxmemory-policy allkeys-lru
+    volumes:
+      - judge0-redis-data:/data
+    networks:
+      - judge0-network
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+
+  # HAProxy Load Balancer for Judge0
+  judge0-lb:
+    image: haproxy:2.4
+    container_name: judge0-lb
+    restart: unless-stopped
+    ports:
+      - "2357:80"
+    volumes:
+      - ./haproxy-judge0.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
+    depends_on:
+      - judge0-server-1
+      - judge0-server-2
+      - judge0-server-3
+      - judge0-server-4
+      - judge0-server-5
+    networks:
+      - judge0-network
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 512M
+        reservations:
+          cpus: '0.5'
+          memory: 256M
+
+volumes:
+  judge0-postgres-data:
+    driver: local
+  judge0-redis-data:
+    driver: local
+
+networks:
+  judge0-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16

@@ -1,0 +1,139 @@
+# AlertManager Configuration for TechFolks
+global:
+  smtp_smarthost: 'localhost:587'
+  smtp_from: 'alerts@techfolks.com'
+  smtp_auth_username: 'alerts@techfolks.com'
+  smtp_auth_password: 'your-smtp-password'
+  slack_api_url: 'https://hooks.slack.com/services/YOUR/SLACK/WEBHOOK'
+
+# Templates for notifications
+templates:
+  - '/etc/alertmanager/templates/*.tmpl'
+
+# Routing configuration
+route:
+  group_by: ['alertname', 'service']
+  group_wait: 10s
+  group_interval: 10s
+  repeat_interval: 1h
+  receiver: 'web.hook'
+  routes:
+    # Critical alerts go to multiple channels
+    - match:
+        severity: critical
+      receiver: 'critical-alerts'
+      group_wait: 10s
+      repeat_interval: 5m
+    
+    # Warning alerts go to Slack
+    - match:
+        severity: warning
+      receiver: 'warning-alerts'
+      group_wait: 30s
+      repeat_interval: 30m
+    
+    # Business metrics alerts
+    - match:
+        service: techfolks-business
+      receiver: 'business-alerts'
+      group_wait: 1m
+      repeat_interval: 4h
+    
+    # Security alerts need immediate attention
+    - match:
+        service: techfolks-security
+      receiver: 'security-alerts'
+      group_wait: 5s
+      repeat_interval: 10m
+
+# Receivers define how to send notifications
+receivers:
+  - name: 'web.hook'
+    webhook_configs:
+      - url: 'http://localhost:5001/'
+
+  - name: 'critical-alerts'
+    slack_configs:
+      - api_url: 'https://hooks.slack.com/services/YOUR/CRITICAL/WEBHOOK'
+        channel: '#alerts-critical'
+        title: '🚨 Critical Alert - {{ range .Alerts }}{{ .Annotations.summary }}{{ end }}'
+        text: |
+          {{ range .Alerts }}
+          *Alert:* {{ .Annotations.summary }}
+          *Description:* {{ .Annotations.description }}
+          *Service:* {{ .Labels.service }}
+          *Severity:* {{ .Labels.severity }}
+          {{ end }}
+        send_resolved: true
+    email_configs:
+      - to: 'oncall@techfolks.com'
+        subject: '🚨 Critical Alert: {{ range .Alerts }}{{ .Annotations.summary }}{{ end }}'
+        body: |
+          Critical alert has been triggered:
+          
+          {{ range .Alerts }}
+          Alert: {{ .Annotations.summary }}
+          Description: {{ .Annotations.description }}
+          Service: {{ .Labels.service }}
+          Started: {{ .StartsAt }}
+          {{ end }}
+    pagerduty_configs:
+      - service_key: 'YOUR-PAGERDUTY-SERVICE-KEY'
+        description: '{{ range .Alerts }}{{ .Annotations.summary }}{{ end }}'
+
+  - name: 'warning-alerts'
+    slack_configs:
+      - api_url: 'https://hooks.slack.com/services/YOUR/WARNING/WEBHOOK'
+        channel: '#alerts-warning'
+        title: '⚠️ Warning Alert - {{ range .Alerts }}{{ .Annotations.summary }}{{ end }}'
+        text: |
+          {{ range .Alerts }}
+          *Alert:* {{ .Annotations.summary }}
+          *Description:* {{ .Annotations.description }}
+          *Service:* {{ .Labels.service }}
+          {{ end }}
+        send_resolved: true
+
+  - name: 'business-alerts'
+    slack_configs:
+      - api_url: 'https://hooks.slack.com/services/YOUR/BUSINESS/WEBHOOK'
+        channel: '#alerts-business'
+        title: '📊 Business Metric Alert - {{ range .Alerts }}{{ .Annotations.summary }}{{ end }}'
+        text: |
+          {{ range .Alerts }}
+          *Metric:* {{ .Annotations.summary }}
+          *Details:* {{ .Annotations.description }}
+          *Impact:* Business operations may be affected
+          {{ end }}
+
+  - name: 'security-alerts'
+    slack_configs:
+      - api_url: 'https://hooks.slack.com/services/YOUR/SECURITY/WEBHOOK'
+        channel: '#alerts-security'
+        title: '🔒 Security Alert - {{ range .Alerts }}{{ .Annotations.summary }}{{ end }}'
+        text: |
+          {{ range .Alerts }}
+          *Security Event:* {{ .Annotations.summary }}
+          *Details:* {{ .Annotations.description }}
+          *Action Required:* Immediate investigation needed
+          {{ end }}
+        send_resolved: true
+    email_configs:
+      - to: 'security@techfolks.com'
+        subject: '🔒 Security Alert: {{ range .Alerts }}{{ .Annotations.summary }}{{ end }}'
+
+# Inhibition rules to prevent spam
+inhibit_rules:
+  # Inhibit warning alerts if critical alert is already firing
+  - source_match:
+      severity: 'critical'
+    target_match:
+      severity: 'warning'
+    equal: ['alertname', 'service']
+  
+  # Inhibit duplicate alerts for same service
+  - source_match:
+      alertname: 'HighErrorRate'
+    target_match:
+      alertname: 'HighResponseTime'
+    equal: ['service']

@@ -5,7 +5,21 @@ const allowedOrigins = process.env.CLIENT_URL
   : ['http://localhost:3000', 'http://localhost:3001'];
 
 export const corsOptions: CorsOptions = {
-  origin: true, // Allow all origins for development
+  origin: (origin, callback) => {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+    
+    // Use environment variable for allowed origins
+    const allowedOrigins = process.env.FRONTEND_URL 
+      ? process.env.FRONTEND_URL.split(',').map(url => url.trim())
+      : ['http://localhost:5173', 'http://localhost:3000', 'http://localhost:3002'];
+    
+    if (allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS policy'));
+    }
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   allowedHeaders: [

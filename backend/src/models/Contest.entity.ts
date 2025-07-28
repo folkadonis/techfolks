@@ -16,8 +16,8 @@ import { ContestType, ContestStatus } from '../types/enums';
 
 @Entity('contests')
 export class Contest {
-  @PrimaryGeneratedColumn()
-  id: number;
+  @PrimaryGeneratedColumn('uuid')
+  id: string;
 
   @Column({ length: 255 })
   title: string;
@@ -61,7 +61,7 @@ export class Contest {
   status: ContestStatus;
 
   @Column({ name: 'created_by' })
-  created_by: number;
+  created_by: string;
 
   @ManyToOne(() => User)
   @JoinColumn({ name: 'created_by' })

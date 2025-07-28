@@ -94,7 +94,7 @@ export class SubmissionController {
       const userId = req.user?.userId;
 
       const submission = await submissionRepository.findOne({
-        where: { id: parseInt(id) },
+        where: { id: id },
         relations: ['user', 'problem']
       });
 
@@ -266,7 +266,7 @@ export class SubmissionController {
       }
 
       const submission = await submissionRepository.findOne({
-        where: { id: parseInt(id) },
+        where: { id: id },
         relations: ['problem']
       });
 
@@ -309,7 +309,7 @@ export class SubmissionController {
       const { id } = req.params;
 
       const submission = await submissionRepository.findOne({
-        where: { id: parseInt(id) },
+        where: { id: id },
         select: ['id', 'verdict', 'score', 'time_used', 'memory_used', 'error_message']
       });
 
@@ -359,6 +359,122 @@ export class SubmissionController {
           status: result.status.description,
           time: result.time,
           memory: result.memory
+        }
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async submitSolution(req: AuthRequest, res: Response, next: NextFunction) {
+    try {
+      const { id: problemId } = req.params;
+      const { code, language } = req.body;
+      const userId = req.user!.userId;
+
+      // Check if problem exists (handle both UUID and slug)
+      const problem = await problemRepository.findOne({
+        where: [
+          { id: problemId },
+          { slug: problemId }
+        ]
+      });
+
+      if (!problem) {
+        return res.status(404).json({
+          success: false,
+          message: 'Problem not found'
+        });
+      }
+
+      // Check if user has access to the problem
+      if (!problem.is_public) {
+        const user = await userRepository.findOne({ where: { id: userId } });
+        if (!user || (user.role === 'user' && problem.author_id !== userId)) {
+          return res.status(403).json({
+            success: false,
+            message: 'You do not have access to this problem'
+          });
+        }
+      }
+
+      // Create submission
+      const submission = submissionRepository.create({
+        user_id: userId,
+        problem_id: problemId,
+        language,
+        source_code: code,
+        verdict: SubmissionVerdict.PENDING,
+        status: 'pending',
+        submitted_at: new Date()
+      });
+
+      const savedSubmission = await submissionRepository.save(submission);
+
+      // Add to judge queue for processing
+      await submissionQueue.add('judge-submission', {
+        submissionId: savedSubmission.id,
+        problemId,
+        userId,
+        language,
+        sourceCode: code
+      });
+
+      res.status(201).json({
+        success: true,
+        data: savedSubmission,
+        message: 'Submission created successfully'
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async getProblemSubmissions(req: AuthRequest, res: Response, next: NextFunction) {
+    try {
+      const { id: problemId } = req.params;
+      const userId = req.user!.userId;
+      const { page = 1, limit = 20 } = req.query;
+
+      // Check if problem exists (handle both UUID and slug)
+      const problem = await problemRepository.findOne({
+        where: [
+          { id: problemId },
+          { slug: problemId }
+        ]
+      });
+
+      if (!problem) {
+        return res.status(404).json({
+          success: false,
+          message: 'Problem not found'
+        });
+      }
+
+      const queryBuilder = submissionRepository.createQueryBuilder('submission')
+        .leftJoinAndSelect('submission.problem', 'problem')
+        .where('submission.problem_id = :problemId', { problemId })
+        .andWhere('submission.user_id = :userId', { userId });
+
+      queryBuilder.orderBy('submission.submitted_at', 'DESC');
+
+      // Pagination
+      const pageNum = parseInt(page as string);
+      const limitNum = parseInt(limit as string);
+      const offset = (pageNum - 1) * limitNum;
+
+      queryBuilder.skip(offset).take(limitNum);
+
+      const [submissions, total] = await queryBuilder.getManyAndCount();
+
+      res.json({
+        success: true,
+        data: submissions,
+        pagination: {
+          page: pageNum,
+          limit: limitNum,
+          total,
+          totalPages: Math.ceil(total / limitNum)
         }
       });
     } catch (error) {

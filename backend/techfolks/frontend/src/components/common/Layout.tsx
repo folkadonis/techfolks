@@ -17,8 +17,8 @@ const Layout = ({ children }: LayoutProps) => {
     { name: 'Problems', href: '/problems', show: true },
     { name: 'Contests', href: '/contests', show: true },
     { name: 'Groups', href: '/groups', show: isAuthenticated },
-    { name: 'Leaderboard', href: '/leaderboard', show: true },
-    { name: 'Dashboard', href: '/dashboard', show: isAuthenticated },
+    // { name: 'Leaderboard', href: '/leaderboard', show: true },
+    // { name: 'Dashboard', href: '/dashboard', show: isAuthenticated },
     { name: 'Settings', href: '/settings', show: isAuthenticated },
     { name: 'Admin', href: '/admin', show: isAuthenticated && user?.role === 'admin' },
   ]

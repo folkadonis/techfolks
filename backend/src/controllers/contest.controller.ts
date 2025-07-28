@@ -12,6 +12,10 @@ const contestRepository = AppDataSource.getRepository(Contest);
 const userRepository = AppDataSource.getRepository(User);
 const problemRepository = AppDataSource.getRepository(Problem);
 
+const generateSlug = (title: string): string => {
+  return slugify(title, { lower: true, strict: true });
+};
+
 export class ContestController {
   static async createContest(req: AuthRequest, res: Response, next: NextFunction) {
     try {
@@ -89,12 +93,12 @@ export class ContestController {
       // Add problems to contest
       if (problem_ids.length > 0) {
         const problems = await problemRepository.find({
-          where: problem_ids.map((id: number) => ({ id }))
+          where: problem_ids.map((id: string) => ({ id }))
         });
         
         if (problems.length > 0) {
           const values = problems.map((_, idx) => `($1, $${idx * 3 + 2}, $${idx * 3 + 3}, $${idx * 3 + 4})`).join(', ');
-          const params = [contest.id];
+          const params: any[] = [contest.id];
           problems.forEach((p, idx) => {
             params.push(p.id, 100, idx + 1);
           });
@@ -122,7 +126,7 @@ export class ContestController {
       const updates = req.body;
 
       const contest = await contestRepository.findOne({
-        where: { id: parseInt(id) }
+        where: { id: id }
       });
 
       if (!contest) {
@@ -191,7 +195,7 @@ export class ContestController {
       }
 
       const contest = await contestRepository.findOne({
-        where: { id: parseInt(id) }
+        where: { id: id }
       });
 
       if (!contest) {
@@ -214,6 +218,50 @@ export class ContestController {
       res.json({
         success: true,
         message: 'Contest deleted successfully'
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async createGroupContest(req: AuthRequest, res: Response, next: NextFunction) {
+    try {
+      const { groupId } = req.params;
+      const userId = req.user!.userId;
+
+      // Check if user is owner or manager of the group
+      const memberCheck = await AppDataSource.query(`
+        SELECT role FROM group_members 
+        WHERE group_id = $1 AND user_id = $2 AND (role = 'owner' OR role = 'manager')
+      `, [groupId, userId]);
+
+      if (memberCheck.length === 0) {
+        return res.status(403).json({
+          success: false,
+          message: 'Only group owners and managers can create contests'
+        });
+      }
+
+      // Create contest with is_public = false
+      const contestData = {
+        ...req.body,
+        is_public: false,
+        created_by: userId,
+        slug: generateSlug(req.body.title)
+      };
+
+      const contest = contestRepository.create(contestData);
+      const savedContest = await contestRepository.save(contest);
+
+      // Associate contest with group
+      await AppDataSource.query(`
+        INSERT INTO group_contests (group_id, contest_id, added_at)
+        VALUES ($1, $2, NOW())
+      `, [groupId, savedContest.id]);
+
+      res.status(201).json({
+        success: true,
+        data: savedContest
       });
     } catch (error) {
       next(error);
@@ -319,7 +367,8 @@ export class ContestController {
       const userId = (req as AuthRequest).user?.userId;
       if (userId) {
         queryBuilder.andWhere(
-          '(contest.is_public = true OR EXISTS (SELECT 1 FROM contest_participants cp WHERE cp.contest_id = contest.id AND cp.user_id = :userId))',
+          '(contest.is_public = true OR ' +
+          'EXISTS (SELECT 1 FROM contest_participants cp WHERE cp.contest_id = contest.id AND cp.user_id = :userId))',
           { userId }
         );
       } else {
@@ -382,7 +431,7 @@ export class ContestController {
       const userId = req.user!.userId;
 
       const contest = await contestRepository.findOne({
-        where: { id: parseInt(id) }
+        where: { id: id }
       });
 
       if (!contest) {
@@ -445,7 +494,7 @@ export class ContestController {
       const { page = 1, limit = 100 } = req.query;
 
       const contest = await contestRepository.findOne({
-        where: { id: parseInt(id) }
+        where: { id: id }
       });
 
       if (!contest) {

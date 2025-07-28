@@ -15,10 +15,10 @@ const ProblemDetailPage = lazy(() => import('@pages/ProblemDetailPageEnhanced'))
 const ProblemSolvingPage = lazy(() => import('@pages/ProblemSolvingPage'))
 const ContestsPage = lazy(() => import('@pages/ContestsPage'))
 const ContestDetailPage = lazy(() => import('@pages/ContestDetailPage'))
-const LeaderboardPage = lazy(() => import('@pages/LeaderboardPage'))
+// const LeaderboardPage = lazy(() => import('@pages/LeaderboardPage'))
 const ProfilePage = lazy(() => import('@pages/ProfilePage'))
 const SubmissionsPage = lazy(() => import('@pages/SubmissionsPage'))
-const DashboardPage = lazy(() => import('@pages/DashboardPage'))
+// const DashboardPage = lazy(() => import('@pages/DashboardPage'))
 const GroupsPage = lazy(() => import('@pages/GroupsPage'))
 const CreateProblemPage = lazy(() => import('@pages/CreateProblemPage'))
 const EditProblemPage = lazy(() => import('@pages/EditProblemPage'))
@@ -51,8 +51,8 @@ function App() {
       <Suspense fallback={<LoadingSpinner />}>
         <Routes>
           <Route path="/" element={<HomePage />} />
-          <Route path="/login" element={isAuthenticated ? <Navigate to="/dashboard" /> : <LoginPage />} />
-          <Route path="/register" element={isAuthenticated ? <Navigate to="/dashboard" /> : <RegisterPage />} />
+          <Route path="/login" element={isAuthenticated ? <Navigate to="/profile" /> : <LoginPage />} />
+          <Route path="/register" element={isAuthenticated ? <Navigate to="/profile" /> : <RegisterPage />} />
           <Route path="/problems" element={<ProblemsPage />} />
           <Route path="/problems/:id" element={<ProblemDetailPage />} />
           <Route path="/problems/:code/solve" element={<ProblemSolvingPage />} />
@@ -62,11 +62,11 @@ function App() {
           <Route path="/groups" element={<GroupsPage />} />
           <Route path="/groups/join" element={<JoinGroupPage />} />
           <Route path="/groups/:id" element={<GroupDetailPage />} />
-          <Route path="/leaderboard" element={<LeaderboardPage />} />
+          {/* <Route path="/leaderboard" element={<LeaderboardPage />} /> */}
           
           {/* Protected Routes */}
           <Route element={<ProtectedRoute />}>
-            <Route path="/dashboard" element={<DashboardPage />} />
+            {/* <Route path="/dashboard" element={<DashboardPage />} /> */}
             <Route path="/profile" element={<ProfilePage />} />
             <Route path="/submissions" element={<SubmissionsPage />} />
             <Route path="/settings" element={<SettingsPage />} />

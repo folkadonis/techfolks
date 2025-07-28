@@ -2,13 +2,13 @@ import { Request, Response } from 'express';
 import { pgPool } from '../config/database';
 import { logger } from '../utils/logger';
 import { v4 as uuidv4 } from 'uuid';
+import { UserRole } from '../types/enums';
 
 interface AuthenticatedRequest extends Request {
   user?: {
-    id: string;
+    userId: string;
     username: string;
-    email: string;
-    role: string;
+    role: UserRole;
   };
 }
 
@@ -112,7 +112,7 @@ export const getGroups = async (req: Request, res: Response) => {
 
 export const getUserGroups = async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const userId = req.user!.id;
+    const userId = req.user!.userId;
 
     const query = `
       SELECT 
@@ -150,7 +150,7 @@ export const getUserGroups = async (req: AuthenticatedRequest, res: Response) =>
 export const getGroupById = async (req: AuthenticatedRequest, res: Response) => {
   try {
     const groupId = req.params.id;
-    const userId = req.user?.id;
+    const userId = req.user?.userId;
 
     const query = `
       SELECT 
@@ -198,7 +198,7 @@ export const getGroupById = async (req: AuthenticatedRequest, res: Response) => 
 export const createGroup = async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { name, description, is_private = false } = req.body;
-    const userId = req.user!.id;
+    const userId = req.user!.userId;
     const groupId = uuidv4();
     const inviteCode = generateInviteCode();
 
@@ -257,7 +257,7 @@ export const createGroup = async (req: AuthenticatedRequest, res: Response) => {
 export const updateGroup = async (req: AuthenticatedRequest, res: Response) => {
   try {
     const groupId = req.params.id;
-    const userId = req.user!.id;
+    const userId = req.user!.userId;
     const { name, description, is_private } = req.body;
 
     // Check if user is owner
@@ -319,7 +319,7 @@ export const updateGroup = async (req: AuthenticatedRequest, res: Response) => {
 export const deleteGroup = async (req: AuthenticatedRequest, res: Response) => {
   try {
     const groupId = req.params.id;
-    const userId = req.user!.id;
+    const userId = req.user!.userId;
     const userRole = req.user!.role;
 
     // Check if user is owner or admin
@@ -348,7 +348,7 @@ export const deleteGroup = async (req: AuthenticatedRequest, res: Response) => {
 export const joinGroup = async (req: AuthenticatedRequest, res: Response) => {
   try {
     const inviteCode = req.params.code;
-    const userId = req.user!.id;
+    const userId = req.user!.userId;
 
     // Find group by invite code
     const groupResult = await pgPool.query(
@@ -397,7 +397,7 @@ export const joinGroup = async (req: AuthenticatedRequest, res: Response) => {
 export const leaveGroup = async (req: AuthenticatedRequest, res: Response) => {
   try {
     const groupId = req.params.id;
-    const userId = req.user!.id;
+    const userId = req.user!.userId;
 
     // Check if user is owner
     const isOwner = await isGroupOwner(groupId, userId);
@@ -425,7 +425,7 @@ export const leaveGroup = async (req: AuthenticatedRequest, res: Response) => {
 export const getGroupMembers = async (req: AuthenticatedRequest, res: Response) => {
   try {
     const groupId = req.params.id;
-    const userId = req.user!.id;
+    const userId = req.user!.userId;
 
     // Check if user is member of the group
     const memberCheck = await pgPool.query(
@@ -477,7 +477,7 @@ export const removeMember = async (req: AuthenticatedRequest, res: Response) => 
   try {
     const groupId = req.params.id;
     const targetUserId = req.params.userId;
-    const userId = req.user!.id;
+    const userId = req.user!.userId;
 
     // Check if user has permission to remove members
     const canManage = await isGroupManagerOrOwner(groupId, userId);
@@ -512,7 +512,7 @@ export const promoteMember = async (req: AuthenticatedRequest, res: Response) =>
   try {
     const groupId = req.params.id;
     const targetUserId = req.params.userId;
-    const userId = req.user!.id;
+    const userId = req.user!.userId;
 
     // Only owner can promote
     const isOwner = await isGroupOwner(groupId, userId);
@@ -541,7 +541,7 @@ export const demoteMember = async (req: AuthenticatedRequest, res: Response) => 
   try {
     const groupId = req.params.id;
     const targetUserId = req.params.userId;
-    const userId = req.user!.id;
+    const userId = req.user!.userId;
 
     // Only owner can demote
     const isOwner = await isGroupOwner(groupId, userId);

@@ -6,8 +6,9 @@ import { problemsAPI } from '@services/api'
 import toast from 'react-hot-toast'
 
 interface Problem {
-  id: number
-  code: string
+  id: string
+  code?: string
+  slug?: string
   title: string
   difficulty: string
   time_limit: number
@@ -17,6 +18,11 @@ interface Problem {
   solved_count?: number
   attempted_count?: number
   tags?: string[]
+  statistics?: {
+    attempted_by: number
+    accepted_count: number
+    total_submissions: number
+  }
 }
 
 const ProblemsPage = () => {
@@ -42,7 +48,7 @@ const ProblemsPage = () => {
       setLoading(true)
       
       const data = await problemsAPI.getAll()
-      setProblems(data.problems || [])
+      setProblems(data.data || [])
     } catch (error: any) {
       console.error('Error fetching problems:', error)
       toast.error('Failed to load problems')
@@ -54,7 +60,7 @@ const ProblemsPage = () => {
   const generateRecommendations = async () => {
     try {
       const data = await problemsAPI.getRecommendations()
-      setRecommendedProblems(data.problems || [])
+      setRecommendedProblems(data.data || [])
     } catch (error) {
       console.error('Error generating recommendations:', error)
       setRecommendedProblems([])
@@ -236,7 +242,7 @@ const ProblemsPage = () => {
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center space-x-2">
                         <code className="text-sm font-mono bg-muted px-2 py-1 rounded">
-                          {problem.code || `P-${problem.id}`}
+                          {problem.slug || problem.id.substring(0, 8)}
                         </code>
                         {!problem.is_public && (
                           <span className="inline-flex px-2 py-0.5 text-xs font-medium bg-muted-foreground text-background rounded">
@@ -262,8 +268,8 @@ const ProblemsPage = () => {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">
                       <div className="text-xs">
-                        <div>Solved: {problem.solved_count || 0}</div>
-                        <div>Attempts: {problem.attempted_count || 0}</div>
+                        <div>Solved: {problem.statistics?.accepted_count || 0}</div>
+                        <div>Attempts: {problem.statistics?.total_submissions || 0}</div>
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
@@ -281,7 +287,7 @@ const ProblemsPage = () => {
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                       <div className="flex items-center space-x-3">
                         <Link
-                          to={`/problems/${problem.code || `P-${problem.id}`}/solve`}
+                          to={`/problems/${problem.slug || problem.id}/solve`}
                           className="text-primary hover:text-primary/80"
                         >
                           Solve
@@ -293,6 +299,32 @@ const ProblemsPage = () => {
                         >
                           Details
                         </Link>
+                        {isAdmin && (
+                          <>
+                            <Link
+                              to={`/problems/${problem.id}/edit`}
+                              className="text-blue-600 hover:text-blue-800 dark:text-blue-400"
+                            >
+                              Edit
+                            </Link>
+                            <button
+                              onClick={async () => {
+                                if (confirm(`Delete problem "${problem.title}"?`)) {
+                                  try {
+                                    await problemsAPI.delete(problem.id)
+                                    toast.success('Problem deleted')
+                                    fetchProblems()
+                                  } catch (error) {
+                                    toast.error('Failed to delete problem')
+                                  }
+                                }
+                              }}
+                              className="text-red-600 hover:text-red-800 dark:text-red-400"
+                            >
+                              Delete
+                            </button>
+                          </>
+                        )}
                       </div>
                     </td>
                   </tr>
